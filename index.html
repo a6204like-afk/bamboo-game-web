@@ -60,6 +60,14 @@
             border-radius: 5px;
             white-space: nowrap;
         }
+        .is-host { 
+            border: 2px solid #2196f3 !important; 
+            background-color: #e3f2fd !important;
+        }
+        .farmer-name.host-label {
+            color: #1976d2;
+            font-weight: bold;
+        }
 
         .card { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 450px; margin: 0 auto; }
         .bamboo-btn { background: #4caf50; color: white; border: none; width: 100px; height: 100px; border-radius: 50%; font-size: 40px; cursor: pointer; box-shadow: 0 6px 0 #2e7d32; transition: 0.1s; }
@@ -166,6 +174,17 @@
                 document.getElementById('hostStartBtn').style.display = isImHostOrAdmin ? "inline-block" : "none";
                 document.getElementById('adminPanel').style.display = isImHostOrAdmin ? "block" : "none";
 
+                const container = document.getElementById('playerContainer');
+                container.innerHTML = "";
+                keys.forEach(id => {
+                    const p = players[id];
+                    const isHost = (id === hostId);
+                    const tag = document.createElement('span');
+                    tag.className = `player-tag ${isHost ? 'is-host' : ''} ${p.isReady ? 'is-ready' : ''}`;
+                    tag.innerText = (isHost ? "👑 " : "") + (p.isReady ? "🔸 " : "") + p.name;
+                    container.appendChild(tag);
+                });
+
                 // 渲染地圖上的農夫
                 const layer = document.getElementById('playersLayer');
                 layer.innerHTML = "";
@@ -191,12 +210,14 @@
                     }
 
                     // 房主專用的踢人按鈕 (顯示在名字旁)
-                    const kickBtn = (isImHostOrAdmin && id !== currentUser.userId) ? 
-                        `<span onclick="kickPlayer('${id}')" style="cursor:pointer;color:red;margin-left:5px;">❌</span>` : "";
+                    const kickHtml = (imHostOrAdmin && id !== currentUser.userId) ? 
+                        `<span onclick="kickPlayer('${id}')" style="color:red; cursor:pointer; margin-left:3px;">✕</span>` : "";
 
                     farmer.innerHTML = `
                         <div class="farmer-img">${p.isReady ? '⛏️' : (p.avatar || '🧑‍🌾')}</div>
-                        <div class="farmer-name">${p.name}${kickBtn}</div>
+                        <div class="farmer-name ${isHost ? 'host-label' : ''}">
+                            ${isHost ? '👑' : ''}${p.name}${kickHtml}
+                        </div>
                     `;
                     layer.appendChild(farmer);
                 });
@@ -263,15 +284,17 @@
         function hostStartGame() {
             db.ref('game_state').set({ status: 'STARTING', count: 0, lastPlayer: "準備中" });
 
+            const delay = Math.random() * 5000;
             setTimeout(() => {
                 db.ref('game_state').update({
                     status: 'PLAYING',
-                    lastTime: 0, // 設為 0 避免第一個人跟啟動時間撞到
+                    count: 0,
+                    lastTime: 0, // 修復 1：設為 0，第一個人按絕對不會撞到系統
                     lastPlayer: "沒人",
                     voted_players: {},
                     collided_players: {}
                 });
-            }, Math.random() * 5000);
+            }, delay);
         }
 
         function pressBamboo() {
