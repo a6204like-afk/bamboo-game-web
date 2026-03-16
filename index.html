@@ -18,7 +18,7 @@
         .btn-start { background: #2196f3; color: white; }
         .count-num { font-size: 48px; font-weight: bold; color: #1b5e20; }
         #chatBox { height: 100px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 10px; font-size: 13px; background: #fafafa; margin: 10px 0; }
-        .player-tag { display: inline-block; background: #c8e6c9; padding: 3px 8px; border-radius: 10px; margin: 2px; font-size: 12px; transition: 0.3s; }
+        .player-tag { display: inline-block; background: #c8e6c9; padding: 3px 8px; border-radius: 10px; margin: 2px; font-size: 12px; }
         .is-ready { background: #ffcc80 !important; }
         .is-host { border: 2px solid #2196f3; }
         .admin-kick { border: 1px dashed red !important; cursor: pointer; }
@@ -77,17 +77,36 @@
         let isImHostOrAdmin = false;
         let myReadyState = false;
 
+        // 【2】定義進入遊戲的 function (確保放在全域範圍)
+        async function enterGame() {
+            if (!currentUser) {
+                alert("正在登入中，請稍候...");
+                return;
+            }
+            document.getElementById('loginCard').style.display = "none";
+            document.getElementById('gameArea').style.display = "block";
+            
+            // 玩家簽到
+            const userRef = db.ref('online_players/' + currentUser.userId);
+            userRef.set({ name: currentUser.displayName, isReady: false });
+            userRef.onDisconnect().remove();
+        }
+
         async function init() {
+            // 使用你提供的 LIFF ID
             await liff.init({ liffId: "2009477552-iCxgtKls" });
-            if (!liff.isLoggedIn()) { liff.login(); }
-            else {
+            if (!liff.isLoggedIn()) { 
+                liff.login(); 
+            } else {
                 currentUser = await liff.getProfile();
                 document.getElementById('welcomeName').innerText = "你好，" + currentUser.displayName;
+                // 登入成功後再啟動 Firebase 監聽
                 startGlobalSync();
             }
         }
 
         function startGlobalSync() {
+            // 監聽玩家清單與房主判定
             db.ref('online_players').on('value', (snap) => {
                 const players = snap.val() || {};
                 const keys = Object.keys(players);
@@ -111,13 +130,14 @@
                     tag.className = `player-tag ${isHost ? 'is-host' : ''} ${p.isReady ? 'is-ready' : ''} ${isMeAdmin && id !== currentUser.userId ? 'admin-kick' : ''}`;
                     tag.innerText = (isAdmin ? "👑" : "") + (isHost ? "🔵" : "") + (p.isReady ? "🔸" : "") + p.name;
                     
+                    // 管理員踢人功能
                     if (isMeAdmin && id !== currentUser.userId) {
-                        tag.title = "點擊踢出玩家";
                         tag.onclick = () => { if(confirm(`管理員：確定要踢除 ${p.name} 嗎？`)) db.ref('online_players/' + id).remove(); };
                     }
                     container.appendChild(tag);
                 });
 
+                // 按鈕啟動邏輯
                 const startBtn = document.getElementById('hostStartBtn');
                 if (isImHostOrAdmin && (allReady || isMeAdmin) && keys.length > 1) {
                     startBtn.classList.remove('grayscale');
@@ -126,14 +146,16 @@
                 }
             });
 
+            // 遊戲狀態同步
             db.ref('game_state').on('value', (snap) => {
                 const state = snap.val() || { count: 0, status: 'WAITING' };
                 document.getElementById('bambooCount').innerText = state.count;
                 const pressBtn = document.getElementById('pressBtn');
                 const info = document.getElementById('statusInfo');
+                
                 if (state.status === 'PLAYING') {
                     pressBtn.classList.remove('grayscale');
-                    info.innerText = `戰鬥中！上次：${state.lastPlayer}`;
+                    info.innerText = `戰鬥中！上次：${state.lastPlayer || '無'}`;
                 } else if (state.status === 'ENDED') {
                     pressBtn.classList.add('grayscale');
                     info.innerHTML = `<span style="color:red">💥 撞筍了！兇手：${state.lastPlayer}</span>`;
@@ -142,3 +164,66 @@
                     info.innerText = state.status === 'STARTING' ? "倒數準備中..." : "等待開拔...";
                 }
             });
+
+            // 聊天室同步
+            db.ref('chats').limitToLast(15).on('value', (snap) => {
+                const box = document.getElementById('chatBox');
+                let html = "";
+                snap.forEach((child) => {
+                    const msg = child.val();
+                    html += `<div><span style="font-weight:bold;color:#2e7d32;">${msg.name}:</span> ${msg.text}</div>`;
+                });
+                box.innerHTML = html;
+                box.scrollTop = box.scrollHeight;
+            });
+        }
+
+        function toggleReady() {
+            myReadyState = !myReadyState;
+            db.ref('online_players/' + currentUser.userId + '/isReady').set(myReadyState);
+            document.getElementById('readyBtn').innerText = myReadyState ? "取消準備" : "準備好了";
+        }
+
+        function hostStartGame() {
+            if (document.getElementById('hostStartBtn').classList.contains('grayscale')) return;
+            db.ref('game_state/status').set('STARTING');
+            const delay = Math.random() * 5000;
+            setTimeout(() => {
+                db.ref('game_state').update({ status: 'PLAYING', count: 0, lastTime: Date.now(), lastPlayer: "系統" });
+            }, delay);
+        }
+
+        function pressBamboo() {
+            const now = Date.now();
+            db.ref('game_state').transaction((curr) => {
+                if (!curr || curr.status !== 'PLAYING') return;
+                if (now - curr.lastTime < 800) curr.status = 'ENDED';
+                curr.count++;
+                curr.lastTime = now;
+                curr.lastPlayer = currentUser.displayName;
+                return curr;
+            });
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            if (!input.value.trim() || !currentUser) return;
+            db.ref('chats').push({ name: currentUser.displayName, text: input.value, time: Date.now() });
+            input.value = "";
+        }
+
+        function resetEverything() {
+            if (!isImHostOrAdmin) return alert("只有房主或管理者可以重置！");
+            if (confirm("確定要重置所有遊戲狀態與準備嗎？")) {
+                db.ref('game_state').set({ count: 0, status: 'WAITING', lastTime: 0, lastPlayer: "" });
+                db.ref('online_players').once('value', (snap) => {
+                    snap.forEach(child => { child.ref.update({ isReady: false }); });
+                });
+            }
+        }
+
+        // 啟動主程式
+        init();
+    </script>
+</body>
+</html>
