@@ -191,6 +191,7 @@
                 layer.innerHTML = "";
                 keys.forEach((id, index) => {
                     const p = players[id];
+                    if (!p) return;
                     const isHost = (id === hostId);
                     const farmer = document.createElement('div');
                     farmer.className = 'farmer';
@@ -226,11 +227,35 @@
 
             db.ref('game_state').on('value', (snap) => {
                 const state = snap.val() || { count: 0, status: 'WAITING', lastPlayer: "系統" };
+                const isWaiting = (state.status === 'WAITING');
+                const readyBtn = document.getElementById('readyBtn');
+                const hostStartBtn = document.getElementById('hostStartBtn');
+
                 document.getElementById('bambooCount').innerText = state.count;
                 document.getElementById('lastPlayerName').innerText = state.lastPlayer;
                 const btn = document.getElementById('pressBtn');
                 const info = document.getElementById('statusInfo');
                 const coll = document.getElementById('collisionArea');
+
+                if (!isWaiting) {
+                    readyBtn.classList.add('grayscale');
+                    hostStartBtn.classList.add('grayscale');
+                } else {
+                    readyBtn.classList.remove('grayscale');
+                    // 優化：如果是等待中，開拔按鈕要根據「是否全員準備」來決定是否解除灰階
+                    db.ref('online_players').once('value', (pSnap) => {
+                        const p = pSnap.val() || {};
+                        const pKeys = Object.keys(p);
+                        const allReady = pKeys.length > 1 && pKeys.every(k => p[k].isReady);
+                        const isAdmin = (currentUser.userId === ADMIN_UID);
+                        
+                        if (allReady || isAdmin) {
+                            hostStartBtn.classList.remove('grayscale');
+                        } else {
+                            hostStartBtn.classList.add('grayscale');
+                        }
+                    });
+                }
 
                 if (state.status === 'PLAYING') {
                     coll.innerHTML = "";
