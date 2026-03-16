@@ -69,6 +69,31 @@
         const db = firebase.database();
         let currentUser = null;
 
+        function startGlobalSync() {
+            // 不管有沒有進大廳，背景先同步數字
+            db.ref('game_state').on('value', (snap) => {
+                const state = snap.val();
+                if (state) {
+                    document.getElementById('bambooCount').innerText = state.count;
+                    // 更新狀態顯示 (撞筍或上一位是誰)
+                    updateStatusUI(state); 
+                }
+            });
+        }
+
+        function enterGame() {
+            document.getElementById('loginCard').style.display = "none";
+            document.getElementById('gameArea').style.display = "block";
+            
+            // 簽到與聊天室監聽
+            const userRef = db.ref('online_players/' + currentUser.userId);
+            userRef.set({ name: currentUser.displayName });
+            userRef.onDisconnect().remove();
+            
+            // 啟動聊天室同步 (如果之前沒啟動)
+            startSync();
+        }
+
         async function init() {
             // 【請填入你的 LIFF ID】
             await liff.init({ liffId: "2009477552-iCxgtKls" });
@@ -77,18 +102,6 @@
                 currentUser = await liff.getProfile();
                 document.getElementById('welcomeName').innerText = "你好，" + currentUser.displayName;
             }
-        }
-
-        function enterGame() {
-            document.getElementById('loginCard').style.display = "none";
-            document.getElementById('gameArea').style.display = "block";
-            
-            // 簽到與離線處理
-            const userRef = db.ref('online_players/' + currentUser.userId);
-            userRef.set({ name: currentUser.displayName });
-            userRef.onDisconnect().remove();
-
-            startSync();
         }
 
         function startSync() {
