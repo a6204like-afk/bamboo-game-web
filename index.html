@@ -177,6 +177,8 @@
 
                 const container = document.getElementById('playerContainer');
                 container.innerHTML = "";
+                layer.innerHTML = "";
+
                 keys.forEach(id => {
                     const p = players[id];
                     const isHost = (id === hostId);
@@ -188,11 +190,14 @@
 
                 // 渲染地圖上的農夫
                 const layer = document.getElementById('playersLayer');
-                layer.innerHTML = "";
                 keys.forEach((id, index) => {
                     const p = players[id];
                     if (!p) return;
                     const isHost = (id === hostId);
+                    const tag = document.createElement('span');
+                    tag.className = `player-tag ${isHost ? 'is-host' : ''} ${p.isReady ? 'is-ready' : ''}`;
+                    tag.innerText = (isHost ? "👑 " : "") + (p.isReady ? "🔸 " : "") + p.name;
+                    container.appendChild(tag);
                     const farmer = document.createElement('div');
                     farmer.className = 'farmer';
                     
@@ -322,21 +327,44 @@
 
         function pressBamboo() {
             const now = Date.now();
-            db.ref('game_state').transaction((curr) => {
-                if (!curr || curr.status !== 'PLAYING' || (curr.voted_players && curr.voted_players[currentUser.userId])) return;
-                if (!curr.voted_players) curr.voted_players = {};
-                if (now - curr.lastTime < 800) {
-                    curr.status = 'ENDED';
-                    if (!curr.collided_players) curr.collided_players = {};
-                    curr.collided_players[curr.lastPlayerId || 'sys'] = curr.lastPlayer;
-                    curr.collided_players[currentUser.userId] = currentUser.displayName;
-                }
-                curr.count++;
-                curr.lastTime = now;
-                curr.lastPlayer = currentUser.displayName;
-                curr.lastPlayerId = currentUser.userId;
-                curr.voted_players[currentUser.userId] = true;
-                return curr;
+            // 先獲取當前在線人數
+            db.ref('online_players').once('value', (pSnap) => {
+                const totalPlayers = Object.keys(pSnap.val() || {}).length;
+
+                db.ref('game_state').transaction((curr) => {
+                    if (!curr || curr.status !== 'PLAYING' || (curr.voted_players && curr.voted_players[currentUser.userId])) return;
+                    
+                    if (!curr.voted_players) curr.voted_players = {};
+                    
+                    // 判定相撞
+                    if (now - curr.lastTime < 800) {
+                        curr.status = 'ENDED';
+                        if (!curr.collided_players) curr.collided_players = {};
+                        curr.collided_players[curr.lastPlayerId || 'sys'] = curr.lastPlayer;
+                        curr.collided_players[currentUser.userId] = currentUser.displayName;
+                    }
+
+                    curr.count++;
+                    curr.lastTime = now;
+                    curr.lastPlayer = currentUser.displayName;
+                    curr.lastPlayerId = currentUser.userId;
+                    curr.voted_players[currentUser.userId] = true;
+
+                    // 修正點：當拔起人數達到 (總人數 - 1) 且沒撞到，則下一位(最後一位)必輸
+                    const votedCount = Object.keys(curr.voted_players).length;
+                    if (curr.status !== 'ENDED' && votedCount === totalPlayers - 1) {
+                        // 找出誰還沒拔，那個人就是輸家
+                        const allUids = Object.keys(pSnap.val());
+                        const loserUid = allUids.find(uid => !curr.voted_players[uid]);
+                        const loserName = pSnap.val()[loserUid].name;
+
+                        curr.status = 'ENDED';
+                        curr.lastPlayer = loserName; // 直接宣布最後一人輸了
+                        curr.lastPlayerId = loserUid;
+                    }
+
+                    return curr;
+                });
             });
         }
 
