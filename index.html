@@ -74,7 +74,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場</h2>
+        <h2 id="welcomeName">🧑‍🌾 拔筍農場</h2> 
         <button class="bamboo-btn" style="font-size: 20px;" onclick="enterGame()">開工</button>
     </div>
 
@@ -135,10 +135,17 @@
 
         async function init() {
             await liff.init({ liffId: "2009477552-iCxgtKls" });
-            if (!liff.isLoggedIn()) { liff.login(); }
-            else {
+            if (!liff.isLoggedIn()) { 
+                liff.login(); 
+            } else {
                 currentUser = await liff.getProfile();
-                document.getElementById('welcomeName').innerText = "你好，" + currentUser.displayName;
+                
+                // 加入防錯判斷：先確認元素存在再設定值
+                const welcomeElem = document.getElementById('welcomeName');
+                if (welcomeElem) {
+                    welcomeElem.innerText = "你好，" + currentUser.displayName;
+                }
+                
                 startGlobalSync();
             }
         }
