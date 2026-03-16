@@ -4,33 +4,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🌱 竹筍遊戲室</title>
+    
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+
     <style>
-        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f7f9f7; padding: 20px; }
-        .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 350px; margin: 0 auto; }
-        #avatar { width: 60px; height: 60px; border-radius: 50%; margin-bottom: 10px; display: none; margin: 0 auto; }
-        .user-list { text-align: left; background: #eee; border-radius: 10px; padding: 10px; margin-top: 20px; font-size: 14px; }
-        .player-tag { display: inline-block; background: #06c755; color: white; padding: 2px 8px; border-radius: 10px; margin: 2px; }
+        body { font-family: -apple-system, "Helvetica Neue", sans-serif; text-align: center; background-color: #f7f9f7; padding: 20px; color: #333; }
+        .card { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 350px; margin: 20px auto; }
+        #avatar { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; margin: 0 auto 15px; }
+        .welcome-text { font-size: 20px; font-weight: bold; color: #2d5a27; margin-bottom: 5px; }
+        .status-msg { color: #888; font-size: 14px; margin-bottom: 20px; }
+        
+        /* 按鈕樣式 */
+        .btn { background-color: #06c755; color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; width: 100%; }
+        .btn:active { background-color: #05a647; transform: scale(0.98); }
+        .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        /* 大廳清單 */
+        .user-list { text-align: left; background: #f0f0f0; border-radius: 12px; padding: 15px; margin-top: 20px; }
+        .player-tag { display: inline-block; background: #fff; color: #2d5a27; padding: 4px 12px; border-radius: 15px; margin: 4px; font-size: 13px; border: 1px solid #ddd; font-weight: 500; }
+        
+        /* 隱藏區塊 */
+        #lobby { display: none; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <img id="avatar" src="">
-        <div id="userName" style="font-weight: bold;">載入中...</div>
-        <hr>
-        <div id="status">正在連線至遊戲伺服器...</div>
+    <div id="loginCard" class="card">
+        <img id="avatar" src="" alt="User Avatar">
+        <div id="userName" class="welcome-text">讀取中...</div>
+        <div id="status" class="status-msg">正在初始化 LINE 服務...</div>
+        <button id="startBtn" class="btn" style="display: none;" onclick="enterLobby()">進入遊戲室</button>
+    </div>
+
+    <div id="lobby" class="card">
+        <h2 style="margin-top: 0;">🌱 拔筍大廳</h2>
+        <p class="status-msg">連線中 🟢 所有人都能即時看到你</p>
         
         <div class="user-list">
-            <strong>目前在線玩家：</strong>
-            <div id="playerContainer">等待玩家加入...</div>
+            <div style="margin-bottom: 10px; font-weight: bold; font-size: 14px;">目前在線玩家：</div>
+            <div id="playerContainer">等待其他玩家...</div>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; border: 2px dashed #ccc; border-radius: 15px;">
+            <p style="color: #666; font-size: 14px;">（遊戲按鈕開發中...）</p>
+            <button class="btn" disabled>準備開拔</button>
         </div>
     </div>
 
     <script>
-        // 1. 你的 Firebase 設定
+        // 1. Firebase 設定 (請確保這部分正確)
         const firebaseConfig = {
             apiKey: "AIzaSyBHWJPT6ZyvFrZE0-d6gJW-F7EfJCQfeNE",
             authDomain: "bamboo-game.firebaseapp.com",
@@ -44,57 +68,78 @@
         // 初始化 Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        let currentUser = null;
 
-        async function initGame() {
+        // 2. 初始化 LIFF
+        async function initLIFF() {
+            const statusEl = document.getElementById('status');
             try {
-                // 初始化 LIFF (請確認 ID 正確)
-                await liff.init({ liffId: "2009477552-iCxgtKls" }); 
+                // 【請在這裡填入你的 LIFF ID】
+                await liff.init({ liffId: "2009477552-iCxgtKls" });
 
                 if (!liff.isLoggedIn()) {
                     liff.login();
                 } else {
-                    const profile = await liff.getProfile();
-                    const uid = profile.userId;
-                    const name = profile.displayName;
-
-                    // 顯示個人資訊
-                    document.getElementById('userName').innerText = name;
-                    document.getElementById('avatar').src = profile.pictureUrl;
+                    currentUser = await liff.getProfile();
+                    
+                    // 顯示用戶資料
+                    document.getElementById('userName').innerText = "你好，" + currentUser.displayName;
+                    document.getElementById('avatar').src = currentUser.pictureUrl;
                     document.getElementById('avatar').style.display = "block";
-
-                    // 2. 在 Firebase 簽到
-                    const userRef = db.ref('online_players/' + uid);
-                    userRef.set({
-                        name: name,
-                        lastSeen: Date.now()
-                    });
-
-                    // 離線時自動刪除簽到紀錄
-                    userRef.onDisconnect().remove();
-
-                    // 3. 監聽在線人數變化 (即時同步)
-                    db.ref('online_players').on('value', (snapshot) => {
-                        const players = snapshot.val();
-                        const container = document.getElementById('playerContainer');
-                        container.innerHTML = "";
-                        
-                        if (players) {
-                            Object.values(players).forEach(p => {
-                                const span = document.createElement('span');
-                                span.className = 'player-tag';
-                                span.innerText = p.name;
-                                container.appendChild(span);
-                            });
-                            document.getElementById('status').innerText = "遊戲室連線中 🟢";
-                        }
-                    });
+                    document.getElementById('startBtn').style.display = "block";
+                    statusEl.innerText = "身分驗證成功";
                 }
-            } catch (err) {
-                document.getElementById('status').innerText = "錯誤: " + err;
+            } catch (error) {
+                statusEl.innerText = "連線失敗: " + error.message;
+                statusEl.style.color = "red";
             }
         }
 
-        initGame();
+        // 3. 進入大廳的邏輯
+        function enterLobby() {
+            if (!currentUser) return;
+
+            // 切換畫面
+            document.getElementById('loginCard').style.display = "none";
+            document.getElementById('lobby').style.display = "block";
+
+            // 在 Firebase 簽到
+            const userRef = db.ref('online_players/' + currentUser.userId);
+            userRef.set({
+                name: currentUser.displayName,
+                avatar: currentUser.pictureUrl,
+                lastSeen: Date.now()
+            });
+
+            // 離線自動移除 (當關閉網頁時)
+            userRef.onDisconnect().remove();
+
+            // 開始即時監聽在線玩家
+            listenToPlayers();
+        }
+
+        // 4. 監聽 Firebase 上的在線玩家清單
+        function listenToPlayers() {
+            const container = document.getElementById('playerContainer');
+            db.ref('online_players').on('value', (snapshot) => {
+                const players = snapshot.val();
+                container.innerHTML = ""; // 清空舊列表
+
+                if (players) {
+                    Object.values(players).forEach(player => {
+                        const span = document.createElement('span');
+                        span.className = 'player-tag';
+                        span.innerText = "👤 " + player.name;
+                        container.appendChild(span);
+                    });
+                } else {
+                    container.innerText = "目前沒有其他玩家";
+                }
+            });
+        }
+
+        // 啟動程式
+        initLIFF();
     </script>
 </body>
 </html>
