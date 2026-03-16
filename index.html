@@ -103,7 +103,12 @@
             <input type="text" id="chatInput" placeholder="垃圾話..." style="flex:1; padding: 8px; border-radius: 20px; border: 1px solid #ccc;" onkeypress="if(event.keyCode==13) sendChat()">
             <button onclick="sendChat()" style="background:#4caf50; color:white; border:none; border-radius:20px; padding:0 15px; margin-left:5px;">送出</button>
         </div>
-        
+
+        <div style="text-align: left; border-top: 1px solid #eee; padding-top: 10px;">
+            <div style="font-size: 12px; color: #666;">玩家 (🔵房主 / 🔸準備 / 👑管理)：</div>
+            <div id="playerContainer"></div>
+        </div>
+
         <div id="adminPanel" style="display:none; margin-top:10px;">
             <button class="btn-ui" style="font-size:10px;" onclick="clearChats()">清聊天</button>
             <button class="btn-ui" style="font-size:10px;" onclick="resetEverything()">重置遊戲</button>
@@ -169,19 +174,29 @@
                     const farmer = document.createElement('div');
                     farmer.className = 'farmer';
                     
-                    // 動態計算座標：準備好就去中心，沒準備就在隨機位
                     if (p.isReady) {
-                        farmer.style.top = "50%";
-                        farmer.style.left = "50%";
-                        farmer.style.transform = "translate(-50%, -100%)"; // 站在中心點上方
+                        // 圓周隨機定位邏輯：圍繞中心點 (50%, 50%)
+                        // 使用玩家 ID 的雜湊或固定隨機值來保持位置固定，避免閃爍
+                        const angle = (keys.indexOf(id) / keys.length) * 2 * Math.PI;
+                        const radius = 15; // 圓周半徑 (%)
+                        const posX = 50 + radius * Math.cos(angle);
+                        const posY = 50 + radius * Math.sin(angle);
+                        
+                        farmer.style.left = posX + "%";
+                        farmer.style.top = posY + "%";
+                        farmer.style.transform = "translate(-50%, -50%)";
                     } else {
                         farmer.style.top = (p.posY || 0) + "%";
                         farmer.style.left = (p.posX || 0) + "%";
                     }
 
+                    // 房主專用的踢人按鈕 (顯示在名字旁)
+                    const kickBtn = (isImHostOrAdmin && id !== currentUser.userId) ? 
+                        `<span onclick="kickPlayer('${id}')" style="cursor:pointer;color:red;margin-left:5px;">❌</span>` : "";
+
                     farmer.innerHTML = `
                         <div class="farmer-img">${p.isReady ? '⛏️' : (p.avatar || '🧑‍🌾')}</div>
-                        <div class="farmer-name">${(id===hostId?'🔵':'')+p.name}</div>
+                        <div class="farmer-name">${p.name}${kickBtn}</div>
                     `;
                     layer.appendChild(farmer);
                 });
@@ -246,9 +261,16 @@
         }
 
         function hostStartGame() {
-            db.ref('game_state').set({ status: 'STARTING', count: 0, lastPlayer: "系統" });
+            db.ref('game_state').set({ status: 'STARTING', count: 0, lastPlayer: "準備中" });
+
             setTimeout(() => {
-                db.ref('game_state').update({ status: 'PLAYING', lastTime: Date.now(), voted_players: {}, collided_players: {} });
+                db.ref('game_state').update({
+                    status: 'PLAYING',
+                    lastTime: 0, // 設為 0 避免第一個人跟啟動時間撞到
+                    lastPlayer: "沒人",
+                    voted_players: {},
+                    collided_players: {}
+                });
             }, Math.random() * 5000);
         }
 
@@ -282,6 +304,12 @@
             db.ref('game_state').set({ count: 0, status: 'WAITING', lastPlayer: "系統" });
             db.ref('online_players').once('value', s => s.forEach(c => c.ref.update({ isReady: false })));
         }}
+
+        function kickPlayer(targetId) {
+            if (confirm("確定要踢除該玩家嗎？")) {
+                db.ref('online_players/' + targetId).remove();
+            }
+        }
         init();
     </script>
 </body>
