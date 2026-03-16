@@ -2,145 +2,167 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌱 竹筍遊戲室</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎋 究極拔竹筍</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
-
     <style>
-        body { font-family: -apple-system, "Helvetica Neue", sans-serif; text-align: center; background-color: #f7f9f7; padding: 20px; color: #333; }
-        .card { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 350px; margin: 20px auto; }
-        #avatar { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; margin: 0 auto 15px; }
-        .welcome-text { font-size: 20px; font-weight: bold; color: #2d5a27; margin-bottom: 5px; }
-        .status-msg { color: #888; font-size: 14px; margin-bottom: 20px; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #e8f5e9; padding: 10px; margin: 0; }
+        .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 10px auto; }
+        .bamboo-btn { background: #4caf50; color: white; border: none; width: 120px; height: 120px; border-radius: 50%; font-size: 50px; cursor: pointer; box-shadow: 0 6px 0 #2e7d32; transition: 0.1s; margin: 15px 0; }
+        .bamboo-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #2e7d32; }
+        .bamboo-btn:disabled { background: #bdbdbd; box-shadow: 0 3px 0 #9e9e9e; transform: translateY(3px); }
+        .count-num { font-size: 48px; font-weight: bold; color: #1b5e20; text-shadow: 1px 1px 0 #fff; }
         
-        /* 按鈕樣式 */
-        .btn { background-color: #06c755; color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; width: 100%; }
-        .btn:active { background-color: #05a647; transform: scale(0.98); }
-        .btn:disabled { background-color: #ccc; cursor: not-allowed; }
-
-        /* 大廳清單 */
-        .user-list { text-align: left; background: #f0f0f0; border-radius: 12px; padding: 15px; margin-top: 20px; }
-        .player-tag { display: inline-block; background: #fff; color: #2d5a27; padding: 4px 12px; border-radius: 15px; margin: 4px; font-size: 13px; border: 1px solid #ddd; font-weight: 500; }
+        /* 聊天室樣式 */
+        #chatBox { height: 150px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 10px; font-size: 13px; background: #fafafa; margin-bottom: 10px; }
+        .chat-msg { margin-bottom: 5px; border-bottom: 1px solid #f0f0f0; padding-bottom: 2px; }
+        .chat-name { font-weight: bold; color: #2e7d32; }
         
-        /* 隱藏區塊 */
-        #lobby { display: none; }
+        .player-tag { display: inline-block; background: #c8e6c9; color: #1b5e20; padding: 3px 8px; border-radius: 10px; margin: 2px; font-size: 12px; }
+        #gameArea { display: none; }
+        input[type="text"] { width: 70%; padding: 8px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+        .send-btn { width: 20%; padding: 8px; border: none; background: #4caf50; color: white; border-radius: 20px; margin-left: 5px; }
     </style>
 </head>
 <body>
 
     <div id="loginCard" class="card">
-        <img id="avatar" src="" alt="User Avatar">
-        <div id="userName" class="welcome-text">讀取中...</div>
-        <div id="status" class="status-msg">正在初始化 LINE 服務...</div>
-        <button id="startBtn" class="btn" style="display: none;" onclick="enterLobby()">進入遊戲室</button>
+        <h2 id="welcomeName">🌱 載入中...</h2>
+        <button class="bamboo-btn" style="font-size: 20px;" onclick="enterGame()">進入遊戲</button>
     </div>
 
-    <div id="lobby" class="card">
-        <h2 style="margin-top: 0;">🌱 拔筍大廳</h2>
-        <p class="status-msg">連線中 🟢 所有人都能即時看到你</p>
+    <div id="gameArea" class="card">
+        <div class="count-num">🌱 <span id="bambooCount">0</span></div>
+        <button id="pressBtn" class="bamboo-btn" onclick="pressBamboo()">🎋</button>
         
-        <div class="user-list">
-            <div style="margin-bottom: 10px; font-weight: bold; font-size: 14px;">目前在線玩家：</div>
-            <div id="playerContainer">等待其他玩家...</div>
+        <div id="statusInfo" style="font-weight: bold; color: #ef5350; margin-bottom: 10px;">拔拔拔！別撞到！</div>
+
+        <div id="chatBox"></div>
+        <div style="display: flex; justify-content: center; align-items: center;">
+            <input type="text" id="chatInput" placeholder="輸入垃圾話..." onkeypress="if(event.keyCode==13) sendChat()">
+            <button class="send-btn" onclick="sendChat()">送出</button>
         </div>
 
-        <div style="margin-top: 30px; padding: 20px; border: 2px dashed #ccc; border-radius: 15px;">
-            <p style="color: #666; font-size: 14px;">（遊戲按鈕開發中...）</p>
-            <button class="btn" disabled>準備開拔</button>
+        <div style="margin-top: 15px; text-align: left; border-top: 1px solid #eee; padding-top: 10px;">
+            <div style="font-size: 12px; color: #666;">在線玩家：<span id="playerContainer"></span></div>
         </div>
+        
+        <button onclick="resetGame()" style="margin-top: 15px; font-size: 11px; background: none; border: 1px solid #ddd; border-radius: 5px; color: #bbb;">重置遊戲狀態</button>
     </div>
 
     <script>
-        // 1. Firebase 設定 (請確保這部分正確)
+        // 【請填入你的 Firebase 設定】
         const firebaseConfig = {
             apiKey: "AIzaSyBHWJPT6ZyvFrZE0-d6gJW-F7EfJCQfeNE",
             authDomain: "bamboo-game.firebaseapp.com",
-            projectId: "bamboo-game",
             databaseURL: "https://bamboo-game-default-rtdb.firebaseio.com/",
+            projectId: "bamboo-game",
             storageBucket: "bamboo-game.firebasestorage.app",
             messagingSenderId: "986027038887",
             appId: "1:986027038887:web:d69613c79921b12f1a6382",
             measurementId: "G-R7TYX0Q3XR"
         };
 
-        // 初始化 Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         let currentUser = null;
 
-        // 2. 初始化 LIFF
-        async function initLIFF() {
-            const statusEl = document.getElementById('status');
-            try {
-                // 【請在這裡填入你的 LIFF ID】
-                await liff.init({ liffId: "2009477552-iCxgtKls" });
-
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                } else {
-                    currentUser = await liff.getProfile();
-                    
-                    // 顯示用戶資料
-                    document.getElementById('userName').innerText = "你好，" + currentUser.displayName;
-                    document.getElementById('avatar').src = currentUser.pictureUrl;
-                    document.getElementById('avatar').style.display = "block";
-                    document.getElementById('startBtn').style.display = "block";
-                    statusEl.innerText = "身分驗證成功";
-                }
-            } catch (error) {
-                statusEl.innerText = "連線失敗: " + error.message;
-                statusEl.style.color = "red";
+        async function init() {
+            // 【請填入你的 LIFF ID】
+            await liff.init({ liffId: "2009477552-iCxgtKls" });
+            if (!liff.isLoggedIn()) { liff.login(); }
+            else {
+                currentUser = await liff.getProfile();
+                document.getElementById('welcomeName').innerText = "你好，" + currentUser.displayName;
             }
         }
 
-        // 3. 進入大廳的邏輯
-        function enterLobby() {
-            if (!currentUser) return;
-
-            // 切換畫面
+        function enterGame() {
             document.getElementById('loginCard').style.display = "none";
-            document.getElementById('lobby').style.display = "block";
-
-            // 在 Firebase 簽到
+            document.getElementById('gameArea').style.display = "block";
+            
+            // 簽到與離線處理
             const userRef = db.ref('online_players/' + currentUser.userId);
-            userRef.set({
-                name: currentUser.displayName,
-                avatar: currentUser.pictureUrl,
-                lastSeen: Date.now()
-            });
-
-            // 離線自動移除 (當關閉網頁時)
+            userRef.set({ name: currentUser.displayName });
             userRef.onDisconnect().remove();
 
-            // 開始即時監聽在線玩家
-            listenToPlayers();
+            startSync();
         }
 
-        // 4. 監聽 Firebase 上的在線玩家清單
-        function listenToPlayers() {
-            const container = document.getElementById('playerContainer');
-            db.ref('online_players').on('value', (snapshot) => {
-                const players = snapshot.val();
-                container.innerHTML = ""; // 清空舊列表
+        function startSync() {
+            // 1. 同步玩家清單
+            db.ref('online_players').on('value', (snap) => {
+                const container = document.getElementById('playerContainer');
+                container.innerHTML = "";
+                if (snap.val()) Object.values(snap.val()).forEach(p => {
+                    container.innerHTML += `<span class="player-tag">${p.name}</span>`;
+                });
+            });
 
-                if (players) {
-                    Object.values(players).forEach(player => {
-                        const span = document.createElement('span');
-                        span.className = 'player-tag';
-                        span.innerText = "👤 " + player.name;
-                        container.appendChild(span);
-                    });
+            // 2. 同步竹筍狀態
+            db.ref('game_state').on('value', (snap) => {
+                const state = snap.val();
+                if (!state) return;
+                document.getElementById('bambooCount').innerText = state.count;
+                const btn = document.getElementById('pressBtn');
+                const info = document.getElementById('statusInfo');
+                
+                if (state.isEnded) {
+                    btn.disabled = true;
+                    info.innerHTML = `💥 撞筍了！<br>${state.lastPlayer} 是兇手！`;
+                    info.style.color = "red";
                 } else {
-                    container.innerText = "目前沒有其他玩家";
+                    btn.disabled = false;
+                    info.innerText = state.count > 0 ? `上一隻：${state.lastPlayer}` : "拔拔拔！別撞到！";
+                    info.style.color = "#4caf50";
                 }
+            });
+
+            // 3. 同步聊天室 (只顯示最近 20 則)
+            db.ref('chats').limitToLast(20).on('value', (snap) => {
+                const box = document.getElementById('chatBox');
+                box.innerHTML = "";
+                snap.forEach((child) => {
+                    const msg = child.val();
+                    box.innerHTML += `<div class="chat-msg"><span class="chat-name">${msg.name}:</span> ${msg.text}</div>`;
+                });
+                box.scrollTop = box.scrollHeight;
             });
         }
 
-        // 啟動程式
-        initLIFF();
+        function pressBamboo() {
+            const now = Date.now();
+            db.ref('game_state').transaction((curr) => {
+                if (!curr) return { count: 1, lastTime: now, lastPlayer: currentUser.displayName, isEnded: false };
+                if (curr.isEnded) return;
+                // 撞筍邏輯：小於 0.8 秒就爆
+                if (now - curr.lastTime < 800) { curr.isEnded = true; }
+                curr.count++;
+                curr.lastTime = now;
+                curr.lastPlayer = currentUser.displayName;
+                return curr;
+            });
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            if (!input.value.trim()) return;
+            db.ref('chats').push({
+                name: currentUser.displayName,
+                text: input.value,
+                time: Date.now()
+            });
+            input.value = "";
+        }
+
+        function resetGame() {
+            db.ref('game_state').set({ count: 0, lastTime: 0, lastPlayer: "", isEnded: false });
+            db.ref('chats').remove(); // 清空聊天
+        }
+
+        init();
     </script>
 </body>
 </html>
