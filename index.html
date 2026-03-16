@@ -9,66 +9,27 @@
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f1f8e9; margin: 0; padding: 10px; }
-        
-        /* 大田地容器 */
         #farmMap {
-            width: 100%;
-            height: 250px;
-            background-color: #dcedc8;
-            border: 4px solid #8bc34a;
-            border-radius: 20px;
-            position: relative;
-            overflow: hidden;
-            margin: 10px auto;
-            background-image: radial-gradient(#aed581 10%, transparent 11%);
-            background-size: 30px 30px;
+            width: 100%; height: 250px; background-color: #dcedc8; border: 4px solid #8bc34a; border-radius: 20px;
+            position: relative; overflow: hidden; margin: 10px auto;
+            background-image: radial-gradient(#aed581 10%, transparent 11%); background-size: 30px 30px;
         }
-
-        /* 中間的竹筍田區域 */
         #bambooField {
-            width: 80px;
-            height: 80px;
-            background: #8d6e63;
-            border-radius: 50%;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
-            z-index: 1;
+            width: 80px; height: 80px; background: #8d6e63; border-radius: 50%;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            display: flex; align-items: center; justify-content: center; font-size: 40px; z-index: 1;
         }
-
-        /* 農夫小人物樣式 */
         .farmer {
-            width: 50px;
-            height: 60px;
-            position: absolute;
-            transition: all 0.8s ease-in-out; /* 這是滑動動畫的關鍵 */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            z-index: 2;
+            width: 50px; height: 60px; position: absolute; transition: all 0.8s ease-in-out;
+            display: flex; flex-direction: column; align-items: center; z-index: 2;
         }
         .farmer-img { font-size: 30px; }
         .farmer-name { 
-            font-size: 10px; 
-            background: rgba(255,255,255,0.8); 
-            padding: 1px 4px; 
-            border-radius: 5px;
-            white-space: nowrap;
+            font-size: 10px; background: rgba(255,255,255,0.8); padding: 1px 4px; 
+            border-radius: 5px; white-space: nowrap;
         }
-        .is-host { 
-            border: 2px solid #2196f3 !important; 
-            background-color: #e3f2fd !important;
-        }
-        .farmer-name.host-label {
-            color: #1976d2;
-            font-weight: bold;
-        }
-
+        .is-host { border: 2px solid #2196f3 !important; background-color: #e3f2fd !important; }
+        .host-label { color: #1976d2; font-weight: bold; }
         .card { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 450px; margin: 0 auto; }
         .bamboo-btn { background: #4caf50; color: white; border: none; width: 100px; height: 100px; border-radius: 50%; font-size: 40px; cursor: pointer; box-shadow: 0 6px 0 #2e7d32; transition: 0.1s; }
         .bamboo-btn:active { transform: translateY(3px); }
@@ -87,14 +48,13 @@
     </div>
 
     <div id="gameArea" class="card" style="display:none;">
-        <div style="line-height: 1.1; margin: 15px 0;">
-            <span style="font-size: 32px; font-weight: 800; color: #2e7d32;">
+        <div style="margin: 10px 0; min-height: 90px; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 30px; font-weight: 800; color: #2e7d32;">
                 🌱 <span id="bambooCount">0</span> 隻竹筍
-            </span>
-            <br>
-            <span style="font-size: 18px; color: #666; font-weight: normal;">
+            </div>
+            <div style="font-size: 16px; color: #666; margin-top: 5px;">
                 (<span id="lastPlayerName">系統</span>)
-            </span>
+            </div>
         </div>
 
         <div id="farmMap">
@@ -103,10 +63,10 @@
         </div>
 
         <button id="pressBtn" class="bamboo-btn grayscale" onclick="pressBamboo()">🎋</button>
-        <div id="statusInfo" style="font-weight: bold; color: #4caf50; font-size: 14px;">等待開拔...</div>
-        <div id="collisionArea" style="font-size: 12px; color: red;"></div>
+        <div id="statusInfo" style="font-weight: bold; color: #4caf50; font-size: 14px; margin-top: 10px;">等待開拔...</div>
+        <div id="collisionArea" style="font-size: 12px; color: red; min-height: 15px;"></div>
 
-        <div id="controlPanel">
+        <div id="controlPanel" style="margin-top: 10px;">
             <button id="readyBtn" class="btn-ui btn-ready" onclick="toggleReady()">準備好了</button>
             <button id="hostStartBtn" class="btn-ui btn-start" style="display:none;" onclick="hostStartGame()">開拔</button>
         </div>
@@ -117,20 +77,19 @@
             <button onclick="sendChat()" style="background:#4caf50; color:white; border:none; border-radius:20px; padding:0 15px; margin-left:5px;">送出</button>
         </div>
 
-        <div style="text-align: left; border-top: 1px solid #eee; padding-top: 10px;">
-            <div style="font-size: 12px; color: #666;">玩家 (🔵房主 / 🔸準備 / 👑管理)：</div>
-            <div id="playerContainer"></div>
+        <div style="text-align: left; border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
+            <div style="font-size: 11px; color: #666;">玩家 (🔵房主 / 🔸準備 / 👑管理)：</div>
+            <div id="playerContainer" style="margin-top: 5px;"></div>
         </div>
 
-        <div id="adminPanel" style="display:none; margin-top:10px;">
-            <button class="btn-ui" style="font-size:10px;" onclick="clearChats()">清聊天</button>
-            <button class="btn-ui" style="font-size:10px;" onclick="resetEverything()">重置遊戲</button>
+        <div id="adminPanel" style="display:none; margin-top:10px; border-top: 1px dashed #ccc; padding-top: 10px;">
+            <button class="btn-ui" style="font-size:10px; background:#eee;" onclick="clearChats()">清聊天</button>
+            <button class="btn-ui" style="font-size:10px; background:#eee;" onclick="resetEverything()">重置遊戲</button>
         </div>
     </div>
 
     <script>
         const ADMIN_UID = "U92fe108dea907bd4f4cc28d6da14318a";
-
         const firebaseConfig = {
             apiKey: "AIzaSyBHWJPT6ZyvFrZE0-d6gJW-F7EfJCQfeNE",
             authDomain: "bamboo-game.firebaseapp.com",
@@ -145,40 +104,35 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         let currentUser = null;
-        let isImHostOrAdmin = false;
         let myReadyState = false;
-        // 隨機生成角色皮膚與座標
         const myAvatar = ["👨‍🌾", "👩‍🌾", "🧑‍🌾", "👴", "👵"][Math.floor(Math.random()*5)];
         const myRandomPos = { x: Math.random()*80, y: Math.random()*70 }; 
 
         async function init() {
             await liff.init({ liffId: "2009477552-iCxgtKls" });
-            if (!liff.isLoggedIn()) { 
-                liff.login(); 
-            } else {
+            if (!liff.isLoggedIn()) { liff.login(); } 
+            else {
                 currentUser = await liff.getProfile();
-                
-                // 加入防錯判斷：先確認元素存在再設定值
                 const welcomeElem = document.getElementById('welcomeName');
-                if (welcomeElem) {
-                    welcomeElem.innerText = "你好，" + currentUser.displayName;
-                }
-                
+                if (welcomeElem) welcomeElem.innerText = "你好，" + currentUser.displayName;
                 startGlobalSync();
             }
         }
 
         function startGlobalSync() {
+            // 1. 監聽玩家 (處理踢人、渲染與權限)
             db.ref('online_players').on('value', (snap) => {
                 const players = snap.val() || {};
+                const keys = Object.keys(players);
+                const playerCount = keys.length;
 
+                // 修正 2：自我踢除檢查
                 if (currentUser && !players[currentUser.userId] && document.getElementById('gameArea').style.display !== "none") {
                     alert("你已被房主踢出房間！");
-                    location.reload(); // 重新整理回登入頁
+                    location.reload();
                     return;
                 }
-                const playerCount = keys.length; // 獲取當前人數
-                const keys = Object.keys(players);
+
                 const hostId = keys[0];
                 const isAdmin = (currentUser.userId === ADMIN_UID);
                 const imHostOrAdmin = (hostId === currentUser.userId || isAdmin);
@@ -188,35 +142,28 @@
                 if (adminPanel) adminPanel.style.display = imHostOrAdmin ? "block" : "none";
 
                 const container = document.getElementById('playerContainer');
+                const layer = document.getElementById('playersLayer');
                 container.innerHTML = "";
                 layer.innerHTML = "";
 
-                keys.forEach(id => {
-                    const p = players[id];
-                    if (!p || !p.name) return;
-                    const isHost = (id === hostId);
-                    const tag = document.createElement('span');
-                    tag.className = `player-tag ${isHost ? 'is-host' : ''} ${p.isReady ? 'is-ready' : ''}`;
-                    tag.innerText = (isHost ? "👑 " : "") + (p.isReady ? "🔸 " : "") + p.name;
-                    container.appendChild(tag);
-                });
-
-                // 渲染地圖上的農夫
-                const layer = document.getElementById('playersLayer');
                 keys.forEach((id, index) => {
                     const p = players[id];
-                    if (!p || !p.name) return;
+                    if (!p || !p.name) return; // 修正 3：防止 undefined Bug
+
                     const isHost = (id === hostId);
+                    
+                    // 下方標籤
                     const tag = document.createElement('span');
-                    tag.className = `player-tag ${isHost ? 'is-host' : ''} ${p.isReady ? 'is-ready' : ''}`;
-                    tag.innerText = (isHost ? "👑 " : "") + (p.isReady ? "🔸 " : "") + p.name;
+                    tag.style.marginRight = "5px";
+                    tag.style.fontSize = "12px";
+                    tag.innerText = (isHost ? "🔵" : "") + (p.isReady ? "🔸" : "") + p.name;
                     container.appendChild(tag);
+
+                    // 地圖農夫
                     const farmer = document.createElement('div');
                     farmer.className = 'farmer';
-                    
-                    // 座標計算...
                     if (p.isReady) {
-                        const angle = (index / keys.length) * 2 * Math.PI;
+                        const angle = (index / playerCount) * 2 * Math.PI;
                         const radius = 18; 
                         farmer.style.left = (50 + radius * Math.cos(angle)) + "%";
                         farmer.style.top = (50 + radius * Math.sin(angle)) + "%";
@@ -226,9 +173,8 @@
                         farmer.style.top = (p.posY || 0) + "%";
                     }
 
-                    // --- 這裡會用到 imHostOrAdmin，現在名稱正確了 ---
                     const kickHtml = (imHostOrAdmin && id !== currentUser.userId) ? 
-                        `<span onclick="kickPlayer('${id}')" style="color:red; cursor:pointer; margin-left:3px;">✕</span>` : "";
+                        `<span onclick="kickPlayer('${id}')" style="color:red; cursor:pointer; font-weight:bold;">✕</span>` : "";
 
                     farmer.innerHTML = `
                         <div class="farmer-img">${p.isReady ? '⛏️' : (p.avatar || '🧑‍🌾')}</div>
@@ -239,16 +185,14 @@
                     layer.appendChild(farmer);
                 });
 
-                const info = document.getElementById('statusInfo');
+                // 修正 4：開拔按鈕可用性判斷 (含 2 人限制)
+                const allReady = playerCount > 1 && keys.every(k => players[k].isReady);
                 const startBtn = document.getElementById('hostStartBtn');
+                const info = document.getElementById('statusInfo');
 
-                const allReady = keys.length > 1 && keys.every(k => players[k].isReady);
-                document.getElementById('hostStartBtn').className = `btn-ui btn-start ${ (allReady || isAdmin) ? '' : 'grayscale'}`;
                 if (playerCount < 2) {
                     startBtn.classList.add('grayscale');
-                    if (info.innerText === "等待開拔...") {
-                        info.innerText = "人數不足 (至少需 2 人)";
-                    }
+                    info.innerText = "人數不足 (至少需 2 人)";
                 } else if (!allReady && !isAdmin) {
                     startBtn.classList.add('grayscale');
                     info.innerText = "等待全員準備...";
@@ -258,36 +202,25 @@
                 }
             });
 
+            // 2. 監聽遊戲狀態 (按鈕灰階連動)
             db.ref('game_state').on('value', (snap) => {
                 const state = snap.val() || { count: 0, status: 'WAITING', lastPlayer: "系統" };
                 const isWaiting = (state.status === 'WAITING');
                 const readyBtn = document.getElementById('readyBtn');
                 const hostStartBtn = document.getElementById('hostStartBtn');
-
-                document.getElementById('bambooCount').innerText = state.count;
-                document.getElementById('lastPlayerName').innerText = state.lastPlayer;
                 const btn = document.getElementById('pressBtn');
                 const info = document.getElementById('statusInfo');
                 const coll = document.getElementById('collisionArea');
 
+                document.getElementById('bambooCount').innerText = state.count;
+                document.getElementById('lastPlayerName').innerText = state.lastPlayer;
+
+                // 修正 5：非 WAITING 狀態鎖定按鈕
                 if (!isWaiting) {
                     readyBtn.classList.add('grayscale');
                     hostStartBtn.classList.add('grayscale');
                 } else {
                     readyBtn.classList.remove('grayscale');
-                    // 優化：如果是等待中，開拔按鈕要根據「是否全員準備」來決定是否解除灰階
-                    db.ref('online_players').once('value', (pSnap) => {
-                        const p = pSnap.val() || {};
-                        const pKeys = Object.keys(p);
-                        const allReady = pKeys.length > 1 && pKeys.every(k => p[k].isReady);
-                        const isAdmin = (currentUser.userId === ADMIN_UID);
-                        
-                        if (allReady || isAdmin) {
-                            hostStartBtn.classList.remove('grayscale');
-                        } else {
-                            hostStartBtn.classList.add('grayscale');
-                        }
-                    });
                 }
 
                 if (state.status === 'PLAYING') {
@@ -297,9 +230,12 @@
                     info.innerText = voted ? "等待結果..." : "快拔！";
                 } else if (state.status === 'ENDED') {
                     btn.classList.add('grayscale');
-                    info.innerHTML = "💥 撞筍了！";
-                    if (state.collided_players) {
-                        coll.innerText = "同時擠入：" + Object.values(state.collided_players).join(", ");
+                    if (state.collided_players && Object.keys(state.collided_players).length > 0) {
+                        info.innerHTML = "<span style='color:red'>💥 撞筍了！</span>";
+                        coll.innerText = "貪心鬼：" + Object.values(state.collided_players).join(", ");
+                    } else {
+                        info.innerHTML = `<span style='color:red'>🏁 結束！輸家：${state.lastPlayer}</span>`;
+                        coll.innerText = "沒得拔! 可可憐憐";
                     }
                 } else {
                     btn.classList.add('grayscale');
@@ -322,11 +258,8 @@
             document.getElementById('loginCard').style.display = "none";
             document.getElementById('gameArea').style.display = "block";
             db.ref('online_players/' + currentUser.userId).set({ 
-                name: currentUser.displayName, 
-                isReady: false,
-                avatar: myAvatar,
-                posX: myRandomPos.x,
-                posY: myRandomPos.y
+                name: currentUser.displayName, isReady: false, avatar: myAvatar,
+                posX: myRandomPos.x, posY: myRandomPos.y
             });
             db.ref('online_players/' + currentUser.userId).onDisconnect().remove();
         }
@@ -339,27 +272,15 @@
 
         function hostStartGame() {
             db.ref('online_players').once('value', (snap) => {
-                const players = snap.val() || {};
-                const keys = Object.keys(players);
-
-                // 如果只有一個人，攔截不執行
-                if (keys.length < 2) {
-                    alert("邊緣人不能開拔... 請先邀請朋友！");
-                    return;
-                }
-
-                // 原本的啟動邏輯
-                db.ref('game_state').update({ status: 'STARTING', lastPlayer: "準備中..." });
+                const keys = Object.keys(snap.val() || {});
+                if (keys.length < 2) { alert("至少需 2 人才能開始！"); return; }
                 
+                db.ref('game_state').update({ status: 'STARTING', lastPlayer: "準備中..." });
                 const delay = Math.random() * 5000;
                 setTimeout(() => {
                     db.ref('game_state').update({
-                        status: 'PLAYING',
-                        count: 0,
-                        lastTime: 0,
-                        lastPlayer: "沒人",
-                        voted_players: {},
-                        collided_players: {}
+                        status: 'PLAYING', count: 0, lastTime: 0, lastPlayer: "沒人",
+                        voted_players: {}, collided_players: {}
                     });
                 }, delay);
             });
@@ -367,7 +288,6 @@
 
         function pressBamboo() {
             const now = Date.now();
-            // 先抓取目前總人數
             db.ref('online_players').once('value', (pSnap) => {
                 const allPlayers = pSnap.val() || {};
                 const playerUids = Object.keys(allPlayers);
@@ -375,10 +295,8 @@
 
                 db.ref('game_state').transaction((curr) => {
                     if (!curr || curr.status !== 'PLAYING' || (curr.voted_players && curr.voted_players[currentUser.userId])) return;
-                    
                     if (!curr.voted_players) curr.voted_players = {};
 
-                    // 判斷撞筍 (800ms 內)
                     if (now - curr.lastTime < 800) {
                         curr.status = 'ENDED';
                         if (!curr.collided_players) curr.collided_players = {};
@@ -392,18 +310,16 @@
                     curr.lastPlayerId = currentUser.userId;
                     curr.voted_players[currentUser.userId] = true;
 
-                    // --- 關鍵邏輯：倒數第二位成功，最後一位直接判輸 ---
+                    // 修正 6：最後一人判定邏輯
                     const votedCount = Object.keys(curr.voted_players).length;
                     if (curr.status !== 'ENDED' && votedCount === playerCount - 1 && playerCount > 1) {
-                        // 找出那位還沒按的可憐蟲
                         const loserUid = playerUids.find(uid => !curr.voted_players[uid]);
                         if (loserUid && allPlayers[loserUid]) {
                             curr.status = 'ENDED';
-                            curr.lastPlayer = allPlayers[loserUid].name; // 將最後一人設為輸家
+                            curr.lastPlayer = allPlayers[loserUid].name;
                             curr.lastPlayerId = loserUid;
                         }
                     }
-
                     return curr;
                 });
             });
@@ -417,31 +333,15 @@
         function clearChats() { if(confirm("清空？")) db.ref('chats').remove(); }
         function resetEverything() {
             if (confirm("確定要重置所有遊戲狀態嗎？")) {
-                // 1. 重置遊戲狀態
-                db.ref('game_state').set({
-                    count: 0,
-                    status: 'WAITING',
-                    lastPlayer: "系統",
-                    voted_players: {},
-                    collided_players: {}
-                });
-                
-                // 2. 將所有在線玩家設為「未準備」
+                db.ref('game_state').set({ count: 0, status: 'WAITING', lastPlayer: "系統", voted_players: {}, collided_players: {} });
                 db.ref('online_players').once('value', (snap) => {
                     const updates = {};
-                    snap.forEach((child) => {
-                        updates[`online_players/${child.key}/isReady`] = false;
-                    });
+                    snap.forEach((child) => { updates[`online_players/${child.key}/isReady`] = false; });
                     db.ref().update(updates);
                 });
             }
         }
-
-        function kickPlayer(targetId) {
-            if (confirm("確定要踢除該玩家嗎？")) {
-                db.ref('online_players/' + targetId).remove();
-            }
-        }
+        function kickPlayer(targetId) { if (confirm("確定要踢除該玩家嗎？")) db.ref('online_players/' + targetId).remove(); }
         init();
     </script>
 </body>
