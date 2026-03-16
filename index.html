@@ -87,9 +87,14 @@
     </div>
 
     <div id="gameArea" class="card" style="display:none;">
-        <div style="font-size: 22px; font-weight: bold; color: #1b5e20;">
-            🌱 <span id="bambooCount">0</span> 隻竹筍<br>
-            <span style="font-size: 16px; opacity: 0.7;">(<span id="lastPlayerName">系統</span>)</span>
+        <div style="line-height: 1.1; margin: 15px 0;">
+            <span style="font-size: 32px; font-weight: 800; color: #2e7d32;">
+                🌱 <span id="bambooCount">0</span> 隻竹筍
+            </span>
+            <br>
+            <span style="font-size: 18px; color: #666; font-weight: normal;">
+                (<span id="lastPlayerName">系統</span>)
+            </span>
         </div>
 
         <div id="farmMap">
@@ -166,6 +171,13 @@
         function startGlobalSync() {
             db.ref('online_players').on('value', (snap) => {
                 const players = snap.val() || {};
+
+                if (currentUser && !players[currentUser.userId] && document.getElementById('gameArea').style.display !== "none") {
+                    alert("你已被房主踢出房間！");
+                    location.reload(); // 重新整理回登入頁
+                    return;
+                }
+                const playerCount = keys.length; // 獲取當前人數
                 const keys = Object.keys(players);
                 const hostId = keys[0];
                 const isAdmin = (currentUser.userId === ADMIN_UID);
@@ -181,6 +193,7 @@
 
                 keys.forEach(id => {
                     const p = players[id];
+                    if (!p || !p.name) return;
                     const isHost = (id === hostId);
                     const tag = document.createElement('span');
                     tag.className = `player-tag ${isHost ? 'is-host' : ''} ${p.isReady ? 'is-ready' : ''}`;
@@ -192,7 +205,7 @@
                 const layer = document.getElementById('playersLayer');
                 keys.forEach((id, index) => {
                     const p = players[id];
-                    if (!p) return;
+                    if (!p || !p.name) return;
                     const isHost = (id === hostId);
                     const tag = document.createElement('span');
                     tag.className = `player-tag ${isHost ? 'is-host' : ''} ${p.isReady ? 'is-ready' : ''}`;
@@ -226,8 +239,23 @@
                     layer.appendChild(farmer);
                 });
 
+                const info = document.getElementById('statusInfo');
+                const startBtn = document.getElementById('hostStartBtn');
+
                 const allReady = keys.length > 1 && keys.every(k => players[k].isReady);
                 document.getElementById('hostStartBtn').className = `btn-ui btn-start ${ (allReady || isAdmin) ? '' : 'grayscale'}`;
+                if (playerCount < 2) {
+                    startBtn.classList.add('grayscale');
+                    if (info.innerText === "等待開拔...") {
+                        info.innerText = "人數不足 (至少需 2 人)";
+                    }
+                } else if (!allReady && !isAdmin) {
+                    startBtn.classList.add('grayscale');
+                    info.innerText = "等待全員準備...";
+                } else {
+                    startBtn.classList.remove('grayscale');
+                    info.innerText = "可以開拔了！";
+                }
             });
 
             db.ref('game_state').on('value', (snap) => {
@@ -310,33 +338,47 @@
         }
 
         function hostStartGame() {
-            db.ref('game_state').set({ status: 'STARTING', count: 0, lastPlayer: "準備中" });
+            db.ref('online_players').once('value', (snap) => {
+                const players = snap.val() || {};
+                const keys = Object.keys(players);
 
-            const delay = Math.random() * 5000;
-            setTimeout(() => {
-                db.ref('game_state').update({
-                    status: 'PLAYING',
-                    count: 0,
-                    lastTime: 0, // 修復 1：設為 0，第一個人按絕對不會撞到系統
-                    lastPlayer: "沒人",
-                    voted_players: {},
-                    collided_players: {}
-                });
-            }, delay);
+                // 如果只有一個人，攔截不執行
+                if (keys.length < 2) {
+                    alert("邊緣人不能開拔... 請先邀請朋友！");
+                    return;
+                }
+
+                // 原本的啟動邏輯
+                db.ref('game_state').update({ status: 'STARTING', lastPlayer: "準備中..." });
+                
+                const delay = Math.random() * 5000;
+                setTimeout(() => {
+                    db.ref('game_state').update({
+                        status: 'PLAYING',
+                        count: 0,
+                        lastTime: 0,
+                        lastPlayer: "沒人",
+                        voted_players: {},
+                        collided_players: {}
+                    });
+                }, delay);
+            });
         }
 
         function pressBamboo() {
             const now = Date.now();
-            // 先獲取當前在線人數
+            // 先抓取目前總人數
             db.ref('online_players').once('value', (pSnap) => {
-                const totalPlayers = Object.keys(pSnap.val() || {}).length;
+                const allPlayers = pSnap.val() || {};
+                const playerUids = Object.keys(allPlayers);
+                const playerCount = playerUids.length;
 
                 db.ref('game_state').transaction((curr) => {
                     if (!curr || curr.status !== 'PLAYING' || (curr.voted_players && curr.voted_players[currentUser.userId])) return;
                     
                     if (!curr.voted_players) curr.voted_players = {};
-                    
-                    // 判定相撞
+
+                    // 判斷撞筍 (800ms 內)
                     if (now - curr.lastTime < 800) {
                         curr.status = 'ENDED';
                         if (!curr.collided_players) curr.collided_players = {};
@@ -350,17 +392,16 @@
                     curr.lastPlayerId = currentUser.userId;
                     curr.voted_players[currentUser.userId] = true;
 
-                    // 修正點：當拔起人數達到 (總人數 - 1) 且沒撞到，則下一位(最後一位)必輸
+                    // --- 關鍵邏輯：倒數第二位成功，最後一位直接判輸 ---
                     const votedCount = Object.keys(curr.voted_players).length;
-                    if (curr.status !== 'ENDED' && votedCount === totalPlayers - 1) {
-                        // 找出誰還沒拔，那個人就是輸家
-                        const allUids = Object.keys(pSnap.val());
-                        const loserUid = allUids.find(uid => !curr.voted_players[uid]);
-                        const loserName = pSnap.val()[loserUid].name;
-
-                        curr.status = 'ENDED';
-                        curr.lastPlayer = loserName; // 直接宣布最後一人輸了
-                        curr.lastPlayerId = loserUid;
+                    if (curr.status !== 'ENDED' && votedCount === playerCount - 1 && playerCount > 1) {
+                        // 找出那位還沒按的可憐蟲
+                        const loserUid = playerUids.find(uid => !curr.voted_players[uid]);
+                        if (loserUid && allPlayers[loserUid]) {
+                            curr.status = 'ENDED';
+                            curr.lastPlayer = allPlayers[loserUid].name; // 將最後一人設為輸家
+                            curr.lastPlayerId = loserUid;
+                        }
                     }
 
                     return curr;
@@ -374,10 +415,27 @@
             i.value = "";
         }
         function clearChats() { if(confirm("清空？")) db.ref('chats').remove(); }
-        function resetEverything() { if(confirm("重置？")) {
-            db.ref('game_state').set({ count: 0, status: 'WAITING', lastPlayer: "系統" });
-            db.ref('online_players').once('value', s => s.forEach(c => c.ref.update({ isReady: false })));
-        }}
+        function resetEverything() {
+            if (confirm("確定要重置所有遊戲狀態嗎？")) {
+                // 1. 重置遊戲狀態
+                db.ref('game_state').set({
+                    count: 0,
+                    status: 'WAITING',
+                    lastPlayer: "系統",
+                    voted_players: {},
+                    collided_players: {}
+                });
+                
+                // 2. 將所有在線玩家設為「未準備」
+                db.ref('online_players').once('value', (snap) => {
+                    const updates = {};
+                    snap.forEach((child) => {
+                        updates[`online_players/${child.key}/isReady`] = false;
+                    });
+                    db.ref().update(updates);
+                });
+            }
+        }
 
         function kickPlayer(targetId) {
             if (confirm("確定要踢除該玩家嗎？")) {
