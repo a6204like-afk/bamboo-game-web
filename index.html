@@ -5,47 +5,96 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🌱 竹筍遊戲室</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f7f9f7; padding: 40px 20px; color: #333; }
-        .card { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 300px; margin: 0 auto; }
-        #avatar { width: 100px; height: 100px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: none; margin: 0 auto 20px; }
-        .welcome { font-size: 22px; font-weight: bold; color: #2d5a27; margin-bottom: 10px; }
-        .status { color: #888; font-size: 14px; margin-bottom: 20px; }
-        .btn-start { background-color: #06c755; color: white; border: none; padding: 12px 30px; border-radius: 25px; font-size: 16px; font-weight: bold; cursor: pointer; display: none; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f7f9f7; padding: 20px; }
+        .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 350px; margin: 0 auto; }
+        #avatar { width: 60px; height: 60px; border-radius: 50%; margin-bottom: 10px; display: none; margin: 0 auto; }
+        .user-list { text-align: left; background: #eee; border-radius: 10px; padding: 10px; margin-top: 20px; font-size: 14px; }
+        .player-tag { display: inline-block; background: #06c755; color: white; padding: 2px 8px; border-radius: 10px; margin: 2px; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <img id="avatar" src="" alt="頭像">
-        <div id="userName" class="welcome">載入中...</div>
-        <p id="status" class="status">正在與 LINE 建立連線...</p>
-        <button id="startBtn" class="btn-start">進入遊戲室</button>
+        <img id="avatar" src="">
+        <div id="userName" style="font-weight: bold;">載入中...</div>
+        <hr>
+        <div id="status">正在連線至遊戲伺服器...</div>
+        
+        <div class="user-list">
+            <strong>目前在線玩家：</strong>
+            <div id="playerContainer">等待玩家加入...</div>
+        </div>
     </div>
 
     <script>
-        async function initLIFF() {
-            try {
-                // 1. 初始化 LIFF (請填入你剛才在 LINE Login 頻道申請的 LIFF ID)
-                await liff.init({ liffId: "2009477552-iCxgtKls" });
+        // 1. 你的 Firebase 設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyBHWJPT6ZyvFrZE0-d6gJW-F7EfJCQfeNE",
+            authDomain: "bamboo-game.firebaseapp.com",
+            projectId: "bamboo-game",
+            storageBucket: "bamboo-game.firebasestorage.app",
+            messagingSenderId: "986027038887",
+            appId: "1:986027038887:web:d69613c79921b12f1a6382",
+            measurementId: "G-R7TYX0Q3XR"
+        };
 
-                // 2. 檢查登入狀態
+        // 初始化 Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        async function initGame() {
+            try {
+                // 初始化 LIFF (請確認 ID 正確)
+                await liff.init({ liffId: "2009477552-iCxgtKls" }); 
+
                 if (!liff.isLoggedIn()) {
                     liff.login();
                 } else {
-                    // 3. 取得並顯示用戶資料
                     const profile = await liff.getProfile();
-                    document.getElementById('userName').innerText = profile.displayName;
+                    const uid = profile.userId;
+                    const name = profile.displayName;
+
+                    // 顯示個人資訊
+                    document.getElementById('userName').innerText = name;
                     document.getElementById('avatar').src = profile.pictureUrl;
                     document.getElementById('avatar').style.display = "block";
-                    document.getElementById('startBtn').style.display = "inline-block";
-                    document.getElementById('status').innerText = "連線成功！";
+
+                    // 2. 在 Firebase 簽到
+                    const userRef = db.ref('online_players/' + uid);
+                    userRef.set({
+                        name: name,
+                        lastSeen: Date.now()
+                    });
+
+                    // 離線時自動刪除簽到紀錄
+                    userRef.onDisconnect().remove();
+
+                    // 3. 監聽在線人數變化 (即時同步)
+                    db.ref('online_players').on('value', (snapshot) => {
+                        const players = snapshot.val();
+                        const container = document.getElementById('playerContainer');
+                        container.innerHTML = "";
+                        
+                        if (players) {
+                            Object.values(players).forEach(p => {
+                                const span = document.createElement('span');
+                                span.className = 'player-tag';
+                                span.innerText = p.name;
+                                container.appendChild(span);
+                            });
+                            document.getElementById('status').innerText = "遊戲室連線中 🟢";
+                        }
+                    });
                 }
-            } catch (error) {
-                document.getElementById('status').innerText = "錯誤: " + error;
+            } catch (err) {
+                document.getElementById('status').innerText = "錯誤: " + err;
             }
         }
-        initLIFF();
+
+        initGame();
     </script>
 </body>
 </html>
