@@ -3,65 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍：究極判定版</title>
+    <title>🎋 拔竹筍：農夫田地版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #e8f5e9; padding: 10px; margin: 0; }
-        .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: 10px auto; }
-        .bamboo-btn { background: #4caf50; color: white; border: none; width: 120px; height: 120px; border-radius: 50%; font-size: 50px; cursor: pointer; box-shadow: 0 6px 0 #2e7d32; transition: 0.1s; margin: 15px 0; position: relative; }
-        .bamboo-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #2e7d32; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f1f8e9; margin: 0; padding: 10px; }
+        
+        /* 大田地容器 */
+        #farmMap {
+            width: 100%;
+            height: 250px;
+            background-color: #dcedc8;
+            border: 4px solid #8bc34a;
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            margin: 10px auto;
+            background-image: radial-gradient(#aed581 10%, transparent 11%);
+            background-size: 30px 30px;
+        }
+
+        /* 中間的竹筍田區域 */
+        #bambooField {
+            width: 80px;
+            height: 80px;
+            background: #8d6e63;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            z-index: 1;
+        }
+
+        /* 農夫小人物樣式 */
+        .farmer {
+            width: 50px;
+            height: 60px;
+            position: absolute;
+            transition: all 0.8s ease-in-out; /* 這是滑動動畫的關鍵 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 2;
+        }
+        .farmer-img { font-size: 30px; }
+        .farmer-name { 
+            font-size: 10px; 
+            background: rgba(255,255,255,0.8); 
+            padding: 1px 4px; 
+            border-radius: 5px;
+            white-space: nowrap;
+        }
+
+        .card { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 450px; margin: 0 auto; }
+        .bamboo-btn { background: #4caf50; color: white; border: none; width: 100px; height: 100px; border-radius: 50%; font-size: 40px; cursor: pointer; box-shadow: 0 6px 0 #2e7d32; transition: 0.1s; }
+        .bamboo-btn:active { transform: translateY(3px); }
         .grayscale { filter: grayscale(1); opacity: 0.3; pointer-events: none; }
-        .btn-ui { padding: 8px 15px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 3px; font-size: 12px; }
+        .btn-ui { padding: 8px 15px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 3px; }
         .btn-ready { background: #ff9800; color: white; }
         .btn-start { background: #2196f3; color: white; }
-        .btn-danger { background: #f44336; color: white; opacity: 0.6; }
-        .count-num { font-size: 48px; font-weight: bold; color: #1b5e20; }
-        #chatBox { height: 100px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 10px; font-size: 13px; background: #fafafa; margin: 10px 0; }
-        .player-tag { display: inline-block; background: #c8e6c9; padding: 3px 8px; border-radius: 10px; margin: 2px; font-size: 11px; }
-        .is-ready { background: #ffcc80 !important; }
-        .is-host { border: 2px solid #2196f3; }
-        #gameArea { display: none; }
-        .collision-list { font-size: 14px; color: #d32f2f; font-weight: bold; background: #ffebee; border-radius: 10px; padding: 5px; margin-top: 5px; }
+        #chatBox { height: 80px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
     </style>
 </head>
 <body>
 
     <div id="loginCard" class="card">
-        <h2 id="welcomeName">🌱 載入中...</h2>
-        <button class="bamboo-btn" style="font-size: 20px;" onclick="enterGame()">進入遊戲室</button>
+        <h2>🧑‍🌾 拔筍農場</h2>
+        <button class="bamboo-btn" style="font-size: 20px;" onclick="enterGame()">開工</button>
     </div>
 
-    <div id="gameArea" class="card">
-        <div class="count-num" style="line-height: 1.2; margin-bottom: 10px;">
-            🌱 <span id="bambooCount">0</span> 隻竹筍
-            <br>
-            <span style="font-size: 24px; opacity: 0.8;">(<span id="lastPlayerName">系統</span>)</span>
+    <div id="gameArea" class="card" style="display:none;">
+        <div style="font-size: 22px; font-weight: bold; color: #1b5e20;">
+            🌱 <span id="bambooCount">0</span> 隻竹筍<br>
+            <span style="font-size: 16px; opacity: 0.7;">(<span id="lastPlayerName">系統</span>)</span>
         </div>
-        <button id="pressBtn" class="bamboo-btn grayscale" onclick="pressBamboo()">🎋</button>
-        <div id="statusInfo" style="font-weight: bold; color: #4caf50;">等待開拔...</div>
-        <div id="collisionArea"></div>
 
-        <div id="controlPanel" style="margin-top:10px;">
+        <div id="farmMap">
+            <div id="bambooField">🎋</div>
+            <div id="playersLayer"></div>
+        </div>
+
+        <button id="pressBtn" class="bamboo-btn grayscale" onclick="pressBamboo()">🎋</button>
+        <div id="statusInfo" style="font-weight: bold; color: #4caf50; font-size: 14px;">等待開拔...</div>
+        <div id="collisionArea" style="font-size: 12px; color: red;"></div>
+
+        <div id="controlPanel">
             <button id="readyBtn" class="btn-ui btn-ready" onclick="toggleReady()">準備好了</button>
             <button id="hostStartBtn" class="btn-ui btn-start" style="display:none;" onclick="hostStartGame()">開拔</button>
         </div>
 
         <div id="chatBox"></div>
-        <div style="display: flex; justify-content: center; margin-bottom: 5px;">
-            <input type="text" id="chatInput" placeholder="輸入垃圾話..." style="width: 70%; padding: 8px; border: 1px solid #ccc; border-radius: 20px;" onkeypress="if(event.keyCode==13) sendChat()">
-            <button onclick="sendChat()" style="width: 20%; padding: 8px; border: none; background: #4caf50; color: white; border-radius: 20px; margin-left: 5px;">送出</button>
-        </div>
-
-        <div style="text-align: left; border-top: 1px solid #eee; padding-top: 10px;">
-            <div style="font-size: 12px; color: #666;">玩家 (🔵房主 / 🔸準備 / 👑管理)：</div>
-            <div id="playerContainer"></div>
+        <div style="display: flex;">
+            <input type="text" id="chatInput" placeholder="垃圾話..." style="flex:1; padding: 8px; border-radius: 20px; border: 1px solid #ccc;" onkeypress="if(event.keyCode==13) sendChat()">
+            <button onclick="sendChat()" style="background:#4caf50; color:white; border:none; border-radius:20px; padding:0 15px; margin-left:5px;">送出</button>
         </div>
         
-        <div id="adminPanel" style="display:none; margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;">
-            <button class="btn-ui btn-danger" onclick="clearChats()">清除聊天</button>
-            <button id="resetBtn" class="btn-ui btn-danger" onclick="resetEverything()">重置遊戲</button>
+        <div id="adminPanel" style="display:none; margin-top:10px;">
+            <button class="btn-ui" style="font-size:10px;" onclick="clearChats()">清聊天</button>
+            <button class="btn-ui" style="font-size:10px;" onclick="resetEverything()">重置遊戲</button>
         </div>
     </div>
 
@@ -84,6 +129,9 @@
         let currentUser = null;
         let isImHostOrAdmin = false;
         let myReadyState = false;
+        // 隨機生成角色皮膚與座標
+        const myAvatar = ["👨‍🌾", "👩‍🌾", "🧑‍🌾", "👴", "👵"][Math.floor(Math.random()*5)];
+        const myRandomPos = { x: Math.random()*80, y: Math.random()*70 }; 
 
         async function init() {
             await liff.init({ liffId: "2009477552-iCxgtKls" });
@@ -106,60 +154,66 @@
                 document.getElementById('hostStartBtn').style.display = isImHostOrAdmin ? "inline-block" : "none";
                 document.getElementById('adminPanel').style.display = isImHostOrAdmin ? "block" : "none";
 
-                let allReady = keys.length > 1;
-                const container = document.getElementById('playerContainer');
-                container.innerHTML = "";
+                // 渲染地圖上的農夫
+                const layer = document.getElementById('playersLayer');
+                layer.innerHTML = "";
                 keys.forEach(id => {
                     const p = players[id];
-                    if (!p.isReady) allReady = false;
-                    container.innerHTML += `<span class="player-tag ${id===hostId?'is-host':''} ${p.isReady?'is-ready':''}">
-                        ${id===ADMIN_UID?'👑':''}${id===hostId?'🔵':''}${p.isReady?'🔸':''}${p.name}</span>`;
+                    const farmer = document.createElement('div');
+                    farmer.className = 'farmer';
+                    
+                    // 動態計算座標：準備好就去中心，沒準備就在隨機位
+                    if (p.isReady) {
+                        farmer.style.top = "50%";
+                        farmer.style.left = "50%";
+                        farmer.style.transform = "translate(-50%, -100%)"; // 站在中心點上方
+                    } else {
+                        farmer.style.top = (p.posY || 0) + "%";
+                        farmer.style.left = (p.posX || 0) + "%";
+                    }
+
+                    farmer.innerHTML = `
+                        <div class="farmer-img">${p.isReady ? '⛏️' : (p.avatar || '🧑‍🌾')}</div>
+                        <div class="farmer-name">${(id===hostId?'🔵':'')+p.name}</div>
+                    `;
+                    layer.appendChild(farmer);
                 });
 
-                const startBtn = document.getElementById('hostStartBtn');
-                startBtn.className = `btn-ui btn-start ${(allReady || isAdmin) ? '' : 'grayscale'}`;
+                const allReady = keys.length > 1 && keys.every(k => players[k].isReady);
+                document.getElementById('hostStartBtn').className = `btn-ui btn-start ${ (allReady || isAdmin) ? '' : 'grayscale'}`;
             });
 
             db.ref('game_state').on('value', (snap) => {
                 const state = snap.val() || { count: 0, status: 'WAITING', lastPlayer: "系統" };
                 document.getElementById('bambooCount').innerText = state.count;
-                document.getElementById('lastPlayerName').innerText = state.lastPlayer || "系統";
+                document.getElementById('lastPlayerName').innerText = state.lastPlayer;
                 const btn = document.getElementById('pressBtn');
                 const info = document.getElementById('statusInfo');
-                const collisionArea = document.getElementById('collisionArea');
-
-                // 判斷自己是否按過
-                const hasIVoted = state.voted_players && state.voted_players[currentUser.userId];
+                const coll = document.getElementById('collisionArea');
 
                 if (state.status === 'PLAYING') {
-                    collisionArea.innerHTML = "";
-                    if (hasIVoted) {
-                        btn.classList.add('grayscale');
-                        info.innerText = "你已拔過，等待結果...";
-                    } else {
-                        btn.classList.remove('grayscale');
-                        info.innerText = "快拔！每人限一次";
-                    }
+                    coll.innerHTML = "";
+                    const voted = state.voted_players && state.voted_players[currentUser.userId];
+                    btn.className = `bamboo-btn ${voted ? 'grayscale' : ''}`;
+                    info.innerText = voted ? "等待結果..." : "快拔！";
                 } else if (state.status === 'ENDED') {
                     btn.classList.add('grayscale');
-                    info.innerHTML = `<span style="color:red">💥 撞筍了！</span>`;
-                    // 顯示所有同時按下的人
+                    info.innerHTML = "💥 撞筍了！";
                     if (state.collided_players) {
-                        const names = Object.values(state.collided_players).join(", ");
-                        collisionArea.innerHTML = `<div class="collision-list"><br>💀 失敗者：${names}和${state.lastPlayer}</div>`;
+                        coll.innerText = "同時擠入：" + Object.values(state.collided_players).join(", ");
                     }
                 } else {
                     btn.classList.add('grayscale');
-                    info.innerText = state.status === 'STARTING' ? "隨機倒數中..." : "等待開拔...";
+                    info.innerText = state.status === 'STARTING' ? "隨機倒數..." : "等待開拔...";
                 }
             });
 
-            db.ref('chats').limitToLast(15).on('value', (snap) => {
+            db.ref('chats').limitToLast(10).on('value', s => {
                 const box = document.getElementById('chatBox');
                 box.innerHTML = "";
-                snap.forEach(c => {
+                s.forEach(c => {
                     const m = c.val();
-                    box.innerHTML += `<div><span style="font-weight:bold;color:#2e7d32;">${m.name}:</span> ${m.text}</div>`;
+                    box.innerHTML += `<div><b>${m.name}:</b> ${m.text}</div>`;
                 });
                 box.scrollTop = box.scrollHeight;
             });
@@ -168,7 +222,13 @@
         function enterGame() {
             document.getElementById('loginCard').style.display = "none";
             document.getElementById('gameArea').style.display = "block";
-            db.ref('online_players/' + currentUser.userId).set({ name: currentUser.displayName, isReady: false });
+            db.ref('online_players/' + currentUser.userId).set({ 
+                name: currentUser.displayName, 
+                isReady: false,
+                avatar: myAvatar,
+                posX: myRandomPos.x,
+                posY: myRandomPos.y
+            });
             db.ref('online_players/' + currentUser.userId).onDisconnect().remove();
         }
 
@@ -179,33 +239,23 @@
         }
 
         function hostStartGame() {
-            db.ref('game_state').set({ status: 'STARTING', count: 0 });
+            db.ref('game_state').set({ status: 'STARTING', count: 0, lastPlayer: "系統" });
             setTimeout(() => {
-                db.ref('game_state').update({
-                    status: 'PLAYING',
-                    lastTime: Date.now(),
-                    voted_players: {},
-                    collided_players: {}
-                });
+                db.ref('game_state').update({ status: 'PLAYING', lastTime: Date.now(), voted_players: {}, collided_players: {} });
             }, Math.random() * 5000);
         }
 
         function pressBamboo() {
             const now = Date.now();
             db.ref('game_state').transaction((curr) => {
-                if (!curr || curr.status !== 'PLAYING') return;
+                if (!curr || curr.status !== 'PLAYING' || (curr.voted_players && curr.voted_players[currentUser.userId])) return;
                 if (!curr.voted_players) curr.voted_players = {};
-                if (curr.voted_players[currentUser.userId]) return; // 每人限一次
-
-                // 判定撞筍 (0.8秒內有人按過)
                 if (now - curr.lastTime < 800) {
                     curr.status = 'ENDED';
                     if (!curr.collided_players) curr.collided_players = {};
-                    // 把上一個和這一個都加入同時按下名單
-                    curr.collided_players[curr.lastPlayerId || 'prev'] = curr.lastPlayer;
+                    curr.collided_players[curr.lastPlayerId || 'sys'] = curr.lastPlayer;
                     curr.collided_players[currentUser.userId] = currentUser.displayName;
                 }
-
                 curr.count++;
                 curr.lastTime = now;
                 curr.lastPlayer = currentUser.displayName;
@@ -216,23 +266,15 @@
         }
 
         function sendChat() {
-            const input = document.getElementById('chatInput');
-            if (!input.value.trim()) return;
-            db.ref('chats').push({ name: currentUser.displayName, text: input.value });
-            input.value = "";
+            const i = document.getElementById('chatInput');
+            if (i.value.trim()) db.ref('chats').push({ name: currentUser.displayName, text: i.value });
+            i.value = "";
         }
-
-        function clearChats() {
-            if (isImHostOrAdmin && confirm("確定要清空所有聊天紀錄嗎？")) db.ref('chats').remove();
-        }
-
-        function resetEverything() {
-            if (isImHostOrAdmin && confirm("強制重置遊戲？")) {
-                db.ref('game_state').set({ count: 0, status: 'WAITING' });
-                db.ref('online_players').once('value', s => s.forEach(c => c.ref.update({ isReady: false })));
-            }
-        }
-
+        function clearChats() { if(confirm("清空？")) db.ref('chats').remove(); }
+        function resetEverything() { if(confirm("重置？")) {
+            db.ref('game_state').set({ count: 0, status: 'WAITING', lastPlayer: "系統" });
+            db.ref('online_players').once('value', s => s.forEach(c => c.ref.update({ isReady: false })));
+        }}
         init();
     </script>
 </body>
