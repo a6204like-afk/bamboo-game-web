@@ -34,7 +34,7 @@
     </div>
 
     <div id="gameArea" class="card">
-        <div class="count-num">🌱 <span id="bambooCount">0</span></div>
+        <div class="count-num">🌱 <span id="bambooCount">0</span> 隻竹筍 (<span id="lastPlayerName">系統</span>)</div>
         <button id="pressBtn" class="bamboo-btn grayscale" onclick="pressBamboo()">🎋</button>
         <div id="statusInfo" style="font-weight: bold; color: #4caf50;">等待開拔...</div>
         <div id="collisionArea"></div>
@@ -117,8 +117,9 @@
             });
 
             db.ref('game_state').on('value', (snap) => {
-                const state = snap.val() || { count: 0, status: 'WAITING' };
+                const state = snap.val() || { count: 0, status: 'WAITING', lastPlayer: "系統" };
                 document.getElementById('bambooCount').innerText = state.count;
+                document.getElementById('lastPlayerName').innerText = state.lastPlayer || "系統";
                 const btn = document.getElementById('pressBtn');
                 const info = document.getElementById('statusInfo');
                 const collisionArea = document.getElementById('collisionArea');
@@ -141,7 +142,7 @@
                     // 顯示所有同時按下的人
                     if (state.collided_players) {
                         const names = Object.values(state.collided_players).join(", ");
-                        collisionArea.innerHTML = `<div class="collision-list">同時擠入：${names}<br>💀 失敗者：${state.lastPlayer}</div>`;
+                        collisionArea.innerHTML = `<div class="collision-list"><br>💀 失敗者：${names}和${state.lastPlayer}</div>`;
                     }
                 } else {
                     btn.classList.add('grayscale');
