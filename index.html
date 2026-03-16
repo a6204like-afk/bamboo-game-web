@@ -123,6 +123,10 @@
             // 1. 監聽玩家 (處理踢人、渲染與權限)
             db.ref('online_players').on('value', (snap) => {
                 const players = snap.val() || {};
+                if (currentUser && players[currentUser.userId]) {
+                    myReadyState = players[currentUser.userId].isReady; 
+                    document.getElementById('readyBtn').innerText = myReadyState ? "取消準備" : "準備好了";
+                }
                 const keys = Object.keys(players);
                 const playerCount = keys.length;
 
@@ -333,12 +337,26 @@
         function clearChats() { if(confirm("清空？")) db.ref('chats').remove(); }
         function resetEverything() {
             if (confirm("確定要重置所有遊戲狀態嗎？")) {
-                db.ref('game_state').set({ count: 0, status: 'WAITING', lastPlayer: "系統", voted_players: {}, collided_players: {} });
+                // 1. 重置遊戲狀態
+                db.ref('game_state').set({
+                    count: 0,
+                    status: 'WAITING',
+                    lastPlayer: "系統",
+                    voted_players: {},
+                    collided_players: {}
+                });
+                
+                // 2. 將所有在線玩家設為「未準備」
                 db.ref('online_players').once('value', (snap) => {
                     const updates = {};
-                    snap.forEach((child) => { updates[`online_players/${child.key}/isReady`] = false; });
+                    snap.forEach((child) => {
+                        updates[`online_players/${child.key}/isReady`] = false;
+                    });
                     db.ref().update(updates);
                 });
+                
+                // 3. 發送一個特殊的聊天訊息或利用狀態變動來觸發本地重置 (選用)
+                db.ref('chats').push({ name: "系統", text: "♻️ 遊戲已重置，請重新準備" });
             }
         }
         function kickPlayer(targetId) { if (confirm("確定要踢除該玩家嗎？")) db.ref('online_players/' + targetId).remove(); }
