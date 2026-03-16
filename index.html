@@ -34,7 +34,11 @@
     </div>
 
     <div id="gameArea" class="card">
-        <div class="count-num">🌱 <span id="bambooCount">0</span> 隻竹筍 (<span id="lastPlayerName">系統</span>)</div>
+        <div class="count-num" style="line-height: 1.2; margin-bottom: 10px;">
+            🌱 <span id="bambooCount">0</span> 隻竹筍
+            <br>
+            <span style="font-size: 24px; opacity: 0.8;">(<span id="lastPlayerName">系統</span>)</span>
+        </div>
         <button id="pressBtn" class="bamboo-btn grayscale" onclick="pressBamboo()">🎋</button>
         <div id="statusInfo" style="font-weight: bold; color: #4caf50;">等待開拔...</div>
         <div id="collisionArea"></div>
