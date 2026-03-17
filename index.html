@@ -370,7 +370,7 @@
                     if (!curr.collided_players) curr.collided_players = {};
 
                     // 1. 碰撞判定 (800ms 內連續按下)
-                    if (curr.lastTime && (now - curr.lastTime < 800)) {
+                    if (curr.lastTime && (now - curr.lastTime < 400)) {
                         curr.status = 'ENDED';
                         curr.collided_players[curr.lastPlayerId] = true;
                         curr.collided_players[uid] = true;
