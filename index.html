@@ -43,9 +43,13 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2 id="welcomeName">🧑‍🌾 拔筍農場</h2> 
-        <button class="bamboo-btn" style="font-size: 20px;" onclick="enterGame()">開工</button>
+    <h2 id="welcomeName">🧑‍🌾 拔筍農場</h2> 
+    <div id="loginActions">
+        <button id="lineLoginBtn" class="btn-ui btn-start" onclick="liff.login()">登入 LINE</button>
+        <br><br>
+        <button id="enterGameBtn" class="bamboo-btn grayscale" style="font-size: 20px;" onclick="enterGame()">開工</button>
     </div>
+</div>
 
     <div id="gameArea" class="card" style="display:none;">
         <div style="margin: 10px 0; min-height: 90px; display: flex; flex-direction: column; justify-content: center;">
@@ -110,12 +114,22 @@
 
         async function init() {
             await liff.init({ liffId: "2009477552-iCxgtKls" });
-            if (!liff.isLoggedIn()) { liff.login(); } 
-            else {
+            if (liff.isLoggedIn()) {
+                // 已登入：隱藏登入鈕，啟用開工鈕
+                document.getElementById('lineLoginBtn').style.display = "none";
+                const enterBtn = document.getElementById('enterGameBtn');
+                enterBtn.classList.remove('grayscale');
+                enterBtn.style.pointerEvents = "auto";
+                
                 currentUser = await liff.getProfile();
                 const welcomeElem = document.getElementById('welcomeName');
-                if (welcomeElem) welcomeElem.innerText = "你好，" + currentUser.displayName;
+                if (welcomeElem) {
+                    welcomeElem.innerText = "你好，" + currentUser.displayName;
+                }
                 startGlobalSync();
+            } else {
+                // 未登入：保持原狀，等待點擊登入按鈕
+                document.getElementById('enterGameBtn').classList.add('grayscale');
             }
         }
 
@@ -160,7 +174,8 @@
                     const tag = document.createElement('span');
                     tag.style.marginRight = "5px";
                     tag.style.fontSize = "12px";
-                    tag.innerText = (isHost ? "🔵" : "") + (p.isReady ? "🔸" : "") + p.name;
+                    const isPlayerAdmin = (id === ADMIN_UID);
+                    tag.innerText = (isHost ? "🔵 " : "") + (isPlayerAdmin ? "👑 " : "") + (p.isReady ? "🔸 " : "") + p.name;
                     container.appendChild(tag);
 
                     // 地圖農夫
@@ -183,7 +198,7 @@
                     farmer.innerHTML = `
                         <div class="farmer-img">${p.isReady ? '⛏️' : (p.avatar || '🧑‍🌾')}</div>
                         <div class="farmer-name ${isHost ? 'host-label' : ''}">
-                            ${isHost ? '👑' : ''}${p.name}${kickHtml}
+                            ${isHost ? '🔵' : ''}${isPlayerAdmin ? '👑' : ''}${p.name}${kickHtml}
                         </div>
                     `;
                     layer.appendChild(farmer);
