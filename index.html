@@ -311,22 +311,16 @@
             const againBtn = document.getElementById('againBtn');
             const hostBtn = document.getElementById('hostStartBtn');
 
-            // 調整：只要是房主或管理員，隨時都顯示「重置/再來一局」
-            if (imHost || imAdmin) {
-                againBtn.style.display = "inline-block";
-                againBtn.innerText = (state.status === 'ENDED') ? "再來一局" : "重置遊戲";
-            } else {
-                againBtn.style.display = "none";
-            }
-
             if (state.status === 'WAITING') {
                 statusLabel.innerText = "等待玩家準備中...";
+                againBtn.style.display = "none";
                 hostBtn.style.display = imHost ? "inline-block" : "none";
             } else if (state.status === 'PLAYING') {
                 statusLabel.innerText = "🎋 竹筍冒出來了！快拔！";
                 hostBtn.style.display = "none";
             } else {
                 statusLabel.innerText = "遊戲結束！";
+                againBtn.style.display = (imHost || imAdmin) ? "inline-block" : "none";
             }
             document.getElementById('adminPanel').style.display = imAdmin ? "block" : "none";
         }
