@@ -28,7 +28,7 @@
 
         /* 竹筍樣式 */
         .bamboo-item {
-            position: absolute; font-size: 40px; cursor: pointer; z-index: 8;
+            position: absolute; font-size: 40px; cursor: pointer; z-index: 99;
             transition: transform 0.2s; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         @keyframes popIn { from { transform: scale(0) rotate(-20deg); } to { transform: scale(1) rotate(0); } }
@@ -206,10 +206,23 @@
                     farmer.classList.toggle('grayscale', !p.isReady);
                 }
 
+                // --- 找到這段並替換 ---
                 let face = p.avatar || "🧑‍🌾";
                 let bubble = "";
-                if (p.targetX !== undefined) { face = "😊"; bubble = `<div class="bubble">拔到了！</div>`; }
-                if (gameState.status === 'ENDED' && gameState.lastPlayerId === id) { face = "🥺"; bubble = `<div class="bubble">嗚嗚...</div>`; }
+                
+                // 如果有 targetX，代表拔到了
+                if (p.targetX !== undefined && p.targetX !== null) { 
+                    face = "😊"; 
+                    // 顯示「第幾隻」
+                    const orderText = p.votedOrder ? `${p.votedOrder}隻竹筍` : "拔到了！";
+                    bubble = `<div class="bubble">😊 ${orderText}</div>`; 
+                }
+
+                // 輸家判定顯示 (保持不變)
+                if (gameState.status === 'ENDED' && (gameState.lastPlayerId === id || (gameState.isTimeout && !p.targetX && p.isReady))) { 
+                    face = "🥺"; 
+                    bubble = `<div class="bubble">嗚嗚...</div>`; 
+                }
 
                 const isAdmin = (id === ADMIN_UID);
                 const isHost = (id === hostId);
@@ -254,18 +267,34 @@
             });
         }
 
-        function claimBamboo(bid) {
-            if (myReadyState === false) return;
-            db.ref('game_state/bamboos/' + bid).transaction((bamboo) => {
-                if (bamboo && !bamboo.claimedBy) {
-                    bamboo.claimedBy = currentUser.userId;
-                    // 同步移動農夫
-                    db.ref('online_players/' + currentUser.userId).update({
-                        targetX: bamboo.x, targetY: bamboo.y
-                    });
-                    checkGameEnd();
-                    return bamboo;
-                }
+        function claimBamboo(bid, simulatedId = null) {
+            const uid = simulatedId || currentUser.userId;
+            
+            db.ref('/').once('value', (snap) => {
+                const data = snap.val();
+                const p = data.online_players[uid];
+                const bamboos = data.game_state.bamboos || {};
+                
+                // 檢查是否已經拔過
+                if (p && p.targetX !== undefined && p.targetX !== null) return; 
+
+                // 計算這是第幾隻被拔起的 (目前已拔數量 + 1)
+                const claimedCount = Object.keys(bamboos).filter(k => bamboos[k].claimedBy).length;
+                const myOrder = claimedCount + 1;
+
+                db.ref('game_state/bamboos/' + bid).transaction((bamboo) => {
+                    if (bamboo && !bamboo.claimedBy) {
+                        bamboo.claimedBy = uid;
+                        // 存入座標，同時存入拔取的順序序號
+                        db.ref('online_players/' + uid).update({ 
+                            targetX: bamboo.x, 
+                            targetY: bamboo.y,
+                            votedOrder: myOrder  // 新增這行記錄順序
+                        });
+                        checkGameEnd();
+                        return bamboo;
+                    }
+                });
             });
         }
 
@@ -391,9 +420,15 @@
         }
 
         function resetEverything() {
+            clearInterval(gameTimer);
             db.ref('game_state').set({ status: 'WAITING' });
             db.ref('online_players').once('value', s => {
-                s.forEach(c => db.ref('online_players/' + c.key).update({ isReady: false, targetX: null, targetY: null }));
+                s.forEach(c => db.ref('online_players/' + c.key).update({ 
+                    isReady: false, 
+                    targetX: null, 
+                    targetY: null,
+                    votedOrder: null // 清除序號
+                }));
             });
         }
 
