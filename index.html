@@ -32,6 +32,9 @@
             padding: 2px 8px; border-radius: 12px; font-size: 13px; font-weight: 900;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2); white-space: nowrap; z-index: 15; pointer-events: none;
         }
+        .farmer span {
+            pointer-events: auto !important; /* 確保按鈕一定能接收觸控 */
+        }
         .farmer-name { font-size: 11px; background: rgba(255,255,255,0.9); padding: 1px 6px; border-radius: 5px; white-space: nowrap; margin-top: 4px; border: 1px solid #ddd; pointer-events: none; }
         .host-label { border-color: #2196f3; background: #e3f2fd !important; color: #1976d2; font-weight: bold; }
         .admin-label { border-color: #f44336; background: #ffebee !important; color: #d32f2f; font-weight: bold; }
@@ -198,7 +201,10 @@
 
                 const isHost = (id === hostId);
                 const isAdmin = (id === ADMIN_UID);
-                const kickAction = (isAdminUser && id !== currentUser.userId) ? `<span onclick="kickPlayer('${id}')" style="color:red;margin-left:5px;">✕</span>` : "";
+                const kickAction = (isAdminUser && id !== currentUser.userId) ? 
+                `<span onclick="event.stopPropagation(); kickPlayer('${id}')" 
+                    style="color:red; margin-left:5px; cursor:pointer; font-weight:bold; position:relative; z-index:20;">✕</span>` 
+                : "";
 
                 let nameClass = "farmer-name"; let roleIcon = "";
                 if (isAdmin) { nameClass += " admin-label"; roleIcon = "👑 "; }
@@ -224,6 +230,10 @@
 
         function startDrag(e, id) {
             if (!isMoveMode) return;
+
+            // --- 新增：如果點擊的是「✕」按鈕，不啟動拖曳 ---
+            if (e.target.innerText === '✕') return;
+
             const isAdmin = (currentUser.userId === ADMIN_UID);
             if (id !== currentUser.userId && !(isAdmin && id.startsWith('sim_'))) return;
             
