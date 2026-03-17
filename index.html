@@ -8,12 +8,12 @@
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f1f8e9; margin: 0; padding: 10px; overflow: hidden; touch-action: manipulation; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f1f8e9; margin: 0; padding: 10px; min-height: 100vh; }
         #farmMap {
-            width: 100%; height: 420px; background-color: #dcedc8; border: 4px solid #8bc34a;
+            width: 100%; height: 400px; background-color: #dcedc8; border: 4px solid #8bc34a;
             border-radius: 20px; position: relative; overflow: hidden; margin: 5px auto;
             background-image: radial-gradient(#aed581 10%, transparent 11%); background-size: 30px 30px;
-            touch-action: none; /* 防止移動時頁面跟著捲動 */
+            touch-action: none; /* 重要：防止拖曳時網頁捲動 */
         }
         #bambooFieldBtn {
             width: 110px; height: 110px; background: #8d6e63; border: 4px solid #6d4c41;
@@ -36,16 +36,16 @@
         .host-label { border-color: #2196f3; background: #e3f2fd !important; color: #1976d2; font-weight: bold; }
         .admin-label { border-color: #f44336; background: #ffebee !important; color: #d32f2f; font-weight: bold; }
         
-        .card { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto 20px auto; }
         .grayscale { filter: grayscale(1); opacity: 0.4; pointer-events: none !important; }
         .btn-ui { padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 5px; transition: 0.2s; }
         .btn-ready { background: #ff9800; color: white; }
         .btn-cancel { background: #f44336; color: white; }
         .btn-start { background: #2196f3; color: white; }
-        .btn-move { background: #9c27b0; color: white; } /* 移動模式按鈕 */
+        .btn-move { background: #9c27b0; color: white; }
         .btn-again { background: #4caf50; color: white; font-size: 18px; box-shadow: 0 4px 0 #2e7d32; width: 80%; }
         
-        #chatBox { height: 70px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
+        #chatBox { height: 100px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
         .sim-ctrl-box { display: flex; gap: 2px; margin-top: 4px; pointer-events: auto; }
         .sim-btn { padding: 2px 4px; font-size: 10px; cursor: pointer; background: #fff; border: 1px solid #bbb; border-radius: 4px; }
     </style>
@@ -62,7 +62,7 @@
     </div>
 
     <div id="gameArea" class="card" style="display:none;">
-        <div id="farmMap" id="farmMap">
+        <div id="farmMap">
             <button id="bambooFieldBtn" class="grayscale" onclick="pressBamboo()">
                 <div style="font-size: 40px;">🎋</div>
                 <div id="bambooStatus"><span id="bambooCount">0</span> 隻竹筍</div>
@@ -86,7 +86,7 @@
         </div>
 
         <div id="adminPanel" style="display:none; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px;">
-            <div style="font-size: 11px; color: #f44336; font-weight: bold; margin-bottom: 5px;">👑 管理員後台 (房主看不到此區)</div>
+            <div style="font-size: 11px; color: #f44336; font-weight: bold; margin-bottom: 5px;">👑 管理員後台</div>
             <button class="btn-ui" style="font-size:10px; background:#e1f5fe;" onclick="addSimulatedPlayer()">➕ 增加模擬</button>
             <button class="btn-ui" style="font-size:10px; background:#fff3e0;" onclick="clearChats()">🧹 清空聊天</button>
             <button class="btn-ui" style="font-size:10px; background:#ffebee;" onclick="resetEverything()">🔄 重置遊戲</button>
@@ -109,6 +109,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         let currentUser = null;
+        let inGame = false; // 新增變數：標記是否已進入遊戲
         let myReadyState = false;
         let isMoveMode = false;
         let dragTarget = null;
@@ -120,38 +121,34 @@
                 document.getElementById('lineLoginBtn').style.display = "none";
                 document.getElementById('enterGameBtn').classList.remove('grayscale');
                 currentUser = await liff.getProfile();
-                const welcomeElem = document.getElementById('welcomeName');
-                if (welcomeElem) welcomeElem.innerText = "你好，" + currentUser.displayName;
+                document.getElementById('welcomeName').innerText = "你好，" + currentUser.displayName;
                 startGlobalSync();
             }
         }
 
         function startGlobalSync() {
-            const syncUI = () => {
-                db.ref('/').once('value', (rootSnap) => {
-                    const data = rootSnap.val();
-                    const players = data.online_players || {};
-                    const gameState = data.game_state || { status: 'WAITING' };
-                    const keys = Object.keys(players);
-                    
-                    // 檢查自己是否還在列表中 (處理踢除邏輯)
-                    if (!players[currentUser.userId]) {
-                        alert("你已被踢出農場或與伺服器斷開連接！");
-                        location.reload();
-                        return;
-                    }
+            db.ref('/').on('value', (rootSnap) => {
+                const data = rootSnap.val();
+                if (!data) return;
+                const players = data.online_players || {};
+                const gameState = data.game_state || { status: 'WAITING' };
+                const keys = Object.keys(players);
+                
+                // 修正「被踢除」邏輯：只有在 inGame 為 true 且玩家消失時才提示
+                if (inGame && !players[currentUser.userId]) {
+                    alert("你已被踢出農場或與伺服器斷開連接！");
+                    location.reload();
+                    return;
+                }
 
-                    const hostId = keys[0];
-                    const isAdminUser = (currentUser.userId === ADMIN_UID);
-                    myReadyState = players[currentUser.userId].isReady || false;
+                const hostId = keys[0];
+                const isAdminUser = (currentUser.userId === ADMIN_UID);
+                myReadyState = players[currentUser.userId]?.isReady || false;
 
-                    renderPlayers(players, hostId, gameState, isAdminUser);
-                    updateGameStatus(gameState, hostId === currentUser.userId, isAdminUser);
-                });
-            };
+                renderPlayers(players, hostId, gameState, isAdminUser);
+                updateGameStatus(gameState, hostId === currentUser.userId, isAdminUser);
+            });
 
-            db.ref('online_players').on('value', syncUI);
-            db.ref('game_state').on('value', syncUI);
             db.ref('chats').limitToLast(10).on('value', s => {
                 const box = document.getElementById('chatBox'); box.innerHTML = "";
                 s.forEach(c => { const m = c.val(); box.innerHTML += `<div><b>${m.name}:</b> ${m.text}</div>`; });
@@ -174,25 +171,23 @@
                     farmer = document.createElement('div');
                     farmer.id = 'farmer_' + id;
                     farmer.className = 'farmer';
-                    // 綁定拖曳事件
                     farmer.addEventListener('mousedown', (e) => startDrag(e, id));
                     farmer.addEventListener('touchstart', (e) => startDrag(e, id));
                     layer.appendChild(farmer);
                 }
 
-                // 計算位置 (遊戲中且準備好的人繞圈)
                 if (isPlaying && p.isReady) {
                     const rIdx = readyPlayers.indexOf(id);
                     const angle = (rIdx / readyPlayers.length) * 2 * Math.PI;
                     farmer.style.left = (50 + 32 * Math.cos(angle)) + "%";
                     farmer.style.top = (50 + 28 * Math.sin(angle)) + "%";
                     farmer.style.transform = "translate(-50%, -50%)";
-                    farmer.classList.add('grayscale'); // 遊戲中不能拖曳
+                    farmer.style.zIndex = "5";
                 } else {
                     farmer.style.left = (p.posX || 0) + "%";
                     farmer.style.top = (p.posY || 0) + "%";
                     farmer.style.transform = "none";
-                    farmer.classList.toggle('grayscale', isPlaying && !p.isReady);
+                    farmer.style.zIndex = "10";
                 }
 
                 let bubbleHtml = "";
@@ -203,7 +198,7 @@
 
                 const isHost = (id === hostId);
                 const isAdmin = (id === ADMIN_UID);
-                const kickAction = (isAdminUser && id !== currentUser.userId) ? `<span onclick="kickPlayer('${id}')" style="color:red;font-weight:bold;margin-left:3px;cursor:pointer;">✕</span>` : "";
+                const kickAction = (isAdminUser && id !== currentUser.userId) ? `<span onclick="kickPlayer('${id}')" style="color:red;margin-left:5px;">✕</span>` : "";
 
                 let nameClass = "farmer-name"; let roleIcon = "";
                 if (isAdmin) { nameClass += " admin-label"; roleIcon = "👑 "; }
@@ -221,48 +216,43 @@
                 farmer.innerHTML = `${bubbleHtml}<div class="farmer-img">${face}</div><div class="${nameClass}">${roleIcon}${p.isReady ? '🔸' : ''}${p.name}${kickAction}</div>${simControls}`;
             });
 
-            // 移除已離開的玩家
             Array.from(layer.children).forEach(child => {
                 const id = child.id.replace('farmer_', '');
                 if (!players[id]) child.remove();
             });
         }
 
-        // --- 拖曳邏輯 ---
         function startDrag(e, id) {
             if (!isMoveMode) return;
             const isAdmin = (currentUser.userId === ADMIN_UID);
-            // 只有自己能拖曳自己，或者 Admin 拖曳模擬人
             if (id !== currentUser.userId && !(isAdmin && id.startsWith('sim_'))) return;
             
             dragTarget = id;
-            window.addEventListener('mousemove', onDrag);
-            window.addEventListener('mouseup', endDrag);
-            window.addEventListener('touchmove', onDrag);
-            window.addEventListener('touchend', endDrag);
+            const moveHandler = (ev) => onDrag(ev);
+            const endHandler = () => {
+                dragTarget = null;
+                window.removeEventListener('mousemove', moveHandler);
+                window.removeEventListener('mouseup', endHandler);
+                window.removeEventListener('touchmove', moveHandler);
+                window.removeEventListener('touchend', endHandler);
+            };
+            window.addEventListener('mousemove', moveHandler);
+            window.addEventListener('mouseup', endHandler);
+            window.addEventListener('touchmove', moveHandler, { passive: false });
+            window.addEventListener('touchend', endHandler);
         }
 
         function onDrag(e) {
             if (!dragTarget) return;
+            e.preventDefault(); // 防止手機端滑動頁面
             const map = document.getElementById('farmMap');
             const rect = map.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            
             let x = ((clientX - rect.left) / rect.width) * 100 - 5;
             let y = ((clientY - rect.top) / rect.height) * 100 - 10;
-            
-            // 邊界限制
-            x = Math.max(0, Math.min(90, x));
-            y = Math.max(0, Math.min(85, y));
-            
+            x = Math.max(0, Math.min(90, x)); y = Math.max(0, Math.min(85, y));
             db.ref('online_players/' + dragTarget).update({ posX: x, posY: y });
-        }
-
-        function endDrag() {
-            dragTarget = null;
-            window.removeEventListener('mousemove', onDrag);
-            window.removeEventListener('touchmove', onDrag);
         }
 
         function toggleMoveMode() {
@@ -286,7 +276,6 @@
             if (state.status === 'WAITING') {
                 readyBtn.classList.remove('grayscale');
                 hostStartBtn.style.display = imHost ? "inline-block" : "none";
-                hostStartBtn.classList.remove('grayscale');
                 againBtn.style.display = "none";
                 centralBtn.classList.add('grayscale');
                 statusLabel.innerText = "等待玩家準備...";
@@ -303,18 +292,15 @@
                 centralBtn.className = (isPlaying && myReadyState && !alreadyVoted) ? '' : 'grayscale';
                 statusLabel.innerText = isPlaying ? (alreadyVoted ? "已拔取，等結果" : "快點擊中間竹筍！") : "倒數中...";
             }
-            
-            // 只有 Admin (非房主) 能看到管理後台
             document.getElementById('adminPanel').style.display = imAdmin ? "block" : "none";
         }
 
         function enterGame() {
+            inGame = true; // 點擊進入後才開啟「被踢除監測」
             document.getElementById('loginCard').style.display = "none";
             document.getElementById('gameArea').style.display = "block";
-            const x = Math.random() * 80;
-            const y = Math.random() * 80;
             db.ref('online_players/' + currentUser.userId).set({ 
-                name: currentUser.displayName, isReady: false, avatar: myAvatar, posX: x, posY: y 
+                name: currentUser.displayName, isReady: false, avatar: myAvatar, posX: Math.random()*80, posY: Math.random()*80 
             });
             db.ref('online_players/' + currentUser.userId).onDisconnect().remove();
         }
@@ -339,28 +325,21 @@
         function pressBamboo() {
             const uid = currentUser.userId;
             const now = Date.now();
-            db.ref('online_players').once('value', (pSnap) => {
-                const players = pSnap.val();
-                const readyIds = Object.keys(players).filter(k => players[k].isReady);
-                db.ref('game_state').transaction((curr) => {
-                    if (!curr || curr.status !== 'PLAYING' || curr.voted_players?.[uid]) return;
-                    if (curr.lastTime && (now - curr.lastTime < 800)) {
-                        curr.status = 'ENDED';
-                        if (!curr.collided_players) curr.collided_players = {};
-                        curr.collided_players[curr.lastPlayerId] = true;
-                        curr.collided_players[uid] = true;
-                    }
-                    curr.count = (curr.count || 0) + 1;
-                    curr.lastTime = now; curr.lastPlayerId = uid;
-                    if (!curr.voted_players) curr.voted_players = {};
-                    if (!curr.voted_count_at_time) curr.voted_count_at_time = {};
-                    curr.voted_players[uid] = true; curr.voted_count_at_time[uid] = curr.count;
-                    if (curr.status !== 'ENDED' && Object.keys(curr.voted_players).length === readyIds.length - 1 && readyIds.length > 1) {
-                        const loserId = readyIds.find(id => !curr.voted_players[id]);
-                        curr.status = 'ENDED'; curr.lastPlayerId = loserId; curr.isLoserLone = true;
-                    }
-                    return curr;
-                });
+            db.ref('game_state').transaction((curr) => {
+                if (!curr || curr.status !== 'PLAYING' || curr.voted_players?.[uid]) return;
+                if (curr.lastTime && (now - curr.lastTime < 800)) {
+                    curr.status = 'ENDED';
+                    if (!curr.collided_players) curr.collided_players = {};
+                    curr.collided_players[curr.lastPlayerId] = true;
+                    curr.collided_players[uid] = true;
+                }
+                curr.count = (curr.count || 0) + 1;
+                curr.lastTime = now; curr.lastPlayerId = uid;
+                if (!curr.voted_players) curr.voted_players = {};
+                curr.voted_players[uid] = true;
+                if (!curr.voted_count_at_time) curr.voted_count_at_time = {};
+                curr.voted_count_at_time[uid] = curr.count;
+                return curr;
             });
         }
 
@@ -383,20 +362,15 @@
             db.ref('online_players/' + id).set({ name: '測試農夫' + Math.floor(Math.random()*100), isReady: false, avatar: "🤖", posX: Math.random()*80, posY: Math.random()*80 });
         }
         function simulateReady(uid, s) { db.ref('online_players/' + uid + '/isReady').set(s); }
-        function simulatePress(uid, name) { /* 模擬按下邏輯同 pressBamboo 但指定 UID */
+        function simulatePress(uid, name) { 
             const now = Date.now();
-            db.ref('online_players').once('value', (pSnap) => {
-                const players = pSnap.val();
-                const readyIds = Object.keys(players).filter(k => players[k].isReady);
-                db.ref('game_state').transaction((curr) => {
-                    if (!curr || curr.status !== 'PLAYING' || curr.voted_players?.[uid]) return;
-                    if (curr.lastTime && (now - curr.lastTime < 800)) { curr.status = 'ENDED'; if (!curr.collided_players) curr.collided_players = {}; curr.collided_players[curr.lastPlayerId] = true; curr.collided_players[uid] = true; }
-                    curr.count = (curr.count || 0) + 1; curr.lastTime = now; curr.lastPlayerId = uid;
-                    if (!curr.voted_players) curr.voted_players = {}; if (!curr.voted_count_at_time) curr.voted_count_at_time = {};
-                    curr.voted_players[uid] = true; curr.voted_count_at_time[uid] = curr.count;
-                    if (curr.status !== 'ENDED' && Object.keys(curr.voted_players).length === readyIds.length - 1) { const loserId = readyIds.find(id => !curr.voted_players[id]); curr.status = 'ENDED'; curr.lastPlayerId = loserId; curr.isLoserLone = true; }
-                    return curr;
-                });
+            db.ref('game_state').transaction((curr) => {
+                if (!curr || curr.status !== 'PLAYING' || curr.voted_players?.[uid]) return;
+                if (curr.lastTime && (now - curr.lastTime < 800)) { curr.status = 'ENDED'; if (!curr.collided_players) curr.collided_players = {}; curr.collided_players[curr.lastPlayerId] = true; curr.collided_players[uid] = true; }
+                curr.count = (curr.count || 0) + 1; curr.lastTime = now; curr.lastPlayerId = uid;
+                if (!curr.voted_players) curr.voted_players = {}; curr.voted_players[uid] = true;
+                if (!curr.voted_count_at_time) curr.voted_count_at_time = {}; curr.voted_count_at_time[uid] = curr.count;
+                return curr;
             });
         }
         function kickPlayer(id) { if(confirm("確定踢除？")) db.ref('online_players/' + id).remove(); }
