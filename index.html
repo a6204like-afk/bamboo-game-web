@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍：大地農場修正版</title>
+    <title>🎋 拔竹筍：身分標示版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -11,89 +11,73 @@
         body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f1f8e9; margin: 0; padding: 10px; }
         
         #farmMap {
-            width: 100%;
-            height: 400px;
-            background-color: #dcedc8;
-            border: 4px solid #8bc34a;
-            border-radius: 20px;
-            position: relative;
-            overflow: hidden;
-            margin: 5px auto;
-            background-image: radial-gradient(#aed581 10%, transparent 11%);
-            background-size: 30px 30px;
+            width: 100%; height: 420px; background-color: #dcedc8; border: 4px solid #8bc34a;
+            border-radius: 20px; position: relative; overflow: hidden; margin: 5px auto;
+            background-image: radial-gradient(#aed581 10%, transparent 11%); background-size: 30px 30px;
         }
 
-        #bambooField {
-            width: 120px; height: 120px; background: #8d6e63; border: 4px solid #6d4c41;
+        #bambooFieldBtn {
+            width: 110px; height: 110px; background: #8d6e63; border: 4px solid #6d4c41;
             border-radius: 15px; position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 1;
+            align-items: center; justify-content: center; z-index: 5; cursor: pointer;
+            box-shadow: 0 4px 0 #4e342e; transition: 0.1s; outline: none; padding: 0;
         }
+        #bambooFieldBtn:active:not(.grayscale) { transform: translate(-50%, -48%); box-shadow: 0 1px 0 #4e342e; }
         #bambooStatus { color: #fff; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 2px #000; }
 
-        .farmer { width: 65px; height: 90px; position: absolute; transition: all 0.6s ease-out; display: flex; flex-direction: column; align-items: center; z-index: 2; }
-        .farmer-img { font-size: 32px; position: relative; line-height: 1; }
+        .farmer { width: 70px; height: 100px; position: absolute; transition: all 0.6s ease-out; display: flex; flex-direction: column; align-items: center; z-index: 2; }
+        .farmer-img { font-size: 35px; position: relative; line-height: 1; }
         
-        /* 修正：更顯眼的頭頂訊息 */
         .bubble {
-            position: absolute;
-            top: -30px;
-            background: #fff;
-            border: 2px solid #4caf50;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 900;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            white-space: nowrap;
-            z-index: 10;
-            animation: bounce 0.5s ease;
+            position: absolute; top: -30px; background: #fff; border: 2px solid #4caf50;
+            padding: 2px 8px; border-radius: 12px; font-size: 13px; font-weight: 900;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); white-space: nowrap; z-index: 10; animation: bounce 0.5s ease;
         }
         @keyframes bounce { 0% { transform: scale(0.5); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
-        .farmer-name { font-size: 12px; background: rgba(255,255,255,0.9); padding: 1px 6px; border-radius: 5px; white-space: nowrap; margin-top: 4px; border: 1px solid #ddd; }
-        .host-label { border-color: #2196f3; color: #1976d2; font-weight: bold; }
+        .farmer-name { font-size: 11px; background: rgba(255,255,255,0.9); padding: 1px 6px; border-radius: 5px; white-space: nowrap; margin-top: 4px; border: 1px solid #ddd; }
+        /* 身分標籤樣式 */
+        .host-label { border-color: #2196f3; background: #e3f2fd !important; color: #1976d2; font-weight: bold; }
+        .admin-label { border-color: #f44336; background: #ffebee !important; color: #d32f2f; font-weight: bold; }
         
         .card { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; }
-        .bamboo-btn { background: #4caf50; color: white; border: none; width: 85px; height: 85px; border-radius: 50%; font-size: 35px; cursor: pointer; box-shadow: 0 6px 0 #2e7d32; transition: 0.1s; outline: none; }
-        .bamboo-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #2e7d32; }
         .grayscale { filter: grayscale(1); opacity: 0.4; pointer-events: none; }
         
-        .btn-ui { padding: 8px 16px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 4px; }
+        .btn-ui { padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 5px; transition: 0.2s; }
         .btn-ready { background: #ff9800; color: white; }
         .btn-start { background: #2196f3; color: white; }
+        .btn-again { background: #4caf50; color: white; font-size: 18px; box-shadow: 0 4px 0 #2e7d32; width: 80%; }
         
-        #chatBox { height: 70px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
-        .test-btn { padding: 2px 5px; font-size: 10px; cursor: pointer; background: #fff; border: 1px solid #ccc; border-radius: 4px; margin-top: 2px; }
+        #chatBox { height: 80px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
     </style>
 </head>
 <body>
 
     <div id="loginCard" class="card">
-        <h2 id="welcomeName">🧑‍🌾 拔筍農場</h2> <div id="loginActions">
+        <h2 id="welcomeName">🧑‍🌾 拔筍農場</h2> 
+        <div id="loginActions">
             <button id="lineLoginBtn" class="btn-ui btn-start" onclick="liff.login()">登入 LINE</button>
             <br><br>
-            <button id="enterGameBtn" class="bamboo-btn grayscale" style="font-size: 20px;" onclick="enterGame()">開工</button>
+            <button id="enterGameBtn" class="btn-ui btn-start grayscale" onclick="enterGame()">進入田地</button>
         </div>
     </div>
 
     <div id="gameArea" class="card" style="display:none;">
         <div id="farmMap">
-            <div id="bambooField">
+            <button id="bambooFieldBtn" class="grayscale" onclick="pressBamboo()">
                 <div style="font-size: 40px;">🎋</div>
                 <div id="bambooStatus"><span id="bambooCount">0</span> 隻</div>
-            </div>
+            </button>
             <div id="playersLayer"></div>
         </div>
 
-        <div style="display: flex; align-items: center; justify-content: space-around; margin: 10px 0;">
-            <button id="pressBtn" class="bamboo-btn grayscale" onclick="pressBamboo()">🎋</button>
-            <div id="statusInfo" style="font-weight: bold; color: #4caf50; font-size: 14px; width: 120px;">等待開拔...</div>
-        </div>
+        <div id="gameStatusLabel" style="font-weight: bold; color: #4caf50; margin: 8px 0; font-size: 14px;">等待玩家準備...</div>
 
         <div id="controlPanel">
             <button id="readyBtn" class="btn-ui btn-ready" onclick="toggleReady()">準備好了</button>
             <button id="hostStartBtn" class="btn-ui btn-start" style="display:none;" onclick="hostStartGame()">開拔</button>
+            <button id="againBtn" class="btn-ui btn-again" style="display:none;" onclick="resetEverything()">再來一局！</button>
         </div>
 
         <div id="chatBox"></div>
@@ -103,8 +87,7 @@
         </div>
 
         <div id="adminPanel" style="display:none; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px;">
-            <div style="font-size: 12px; margin-bottom: 5px; color: #666;">管理員面板</div>
-            <button class="btn-ui" style="font-size:10px; background:#e1f5fe;" onclick="addSimulatedPlayer()">➕ 增加模擬農夫</button>
+            <button class="btn-ui" style="font-size:10px; background:#e1f5fe;" onclick="addSimulatedPlayer()">➕ 增加模擬</button>
             <button class="btn-ui" style="font-size:10px; background:#fff3e0;" onclick="clearChats()">🧹 清空聊天</button>
             <button class="btn-ui" style="font-size:10px; background:#ffebee;" onclick="resetEverything()">🔄 重置遊戲</button>
         </div>
@@ -131,26 +114,23 @@
         
         function getRandomPos() {
             let x, y;
-            do { x = Math.random() * 85; } while (x > 30 && x < 65);
+            do { x = Math.random() * 80; } while (x > 35 && x < 65);
             do { y = Math.random() * 80; } while (y > 35 && y < 65);
             return { x, y };
         }
-        const myInitPos = getRandomPos();
 
         async function init() {
             await liff.init({ liffId: "2009477552-iCxgtKls" });
             if (liff.isLoggedIn()) {
                 document.getElementById('lineLoginBtn').style.display = "none";
-                const enterBtn = document.getElementById('enterGameBtn');
-                enterBtn.classList.remove('grayscale');
-                enterBtn.style.pointerEvents = "auto";
+                document.getElementById('enterGameBtn').classList.remove('grayscale');
                 currentUser = await liff.getProfile();
-                document.getElementById('welcomeName').innerText = "你好，" + currentUser.displayName;
+                const welcomeElem = document.getElementById('welcomeName');
+                if (welcomeElem) welcomeElem.innerText = "你好，" + currentUser.displayName;
                 startGlobalSync();
             }
         }
 
-        // 核心同步邏輯：確保玩家與遊戲狀態同時觸發渲染
         function startGlobalSync() {
             const syncUI = () => {
                 db.ref('/').once('value', (rootSnap) => {
@@ -159,14 +139,11 @@
                     const gameState = data.game_state || { status: 'WAITING' };
                     const keys = Object.keys(players);
                     const hostId = keys[0];
-                    const isAdmin = (currentUser.userId === ADMIN_UID);
-                    const imHostOrAdmin = (hostId === currentUser.userId || isAdmin);
+                    const isAdminUser = (currentUser.userId === ADMIN_UID);
+                    const imHostOrAdmin = (hostId === currentUser.userId || isAdminUser);
 
                     renderPlayers(players, hostId, gameState, imHostOrAdmin);
-                    updateGameStatus(gameState);
-                    
-                    document.getElementById('hostStartBtn').style.display = imHostOrAdmin ? "inline-block" : "none";
-                    document.getElementById('adminPanel').style.display = imHostOrAdmin ? "block" : "none";
+                    updateGameStatus(gameState, imHostOrAdmin);
                 });
             };
 
@@ -194,94 +171,113 @@
 
             keys.forEach((id) => {
                 const p = players[id];
-                if (!p) return;
+                if (!p || !p.name) return;
 
                 const farmer = document.createElement('div');
                 farmer.className = 'farmer';
                 
-                // 位置計算
                 if (isPlaying) {
                     if (p.isReady) {
                         const rIdx = readyPlayers.indexOf(id);
                         const angle = (rIdx / readyPlayers.length) * 2 * Math.PI;
-                        farmer.style.left = (50 + 30 * Math.cos(angle)) + "%";
-                        farmer.style.top = (50 + 26 * Math.sin(angle)) + "%";
+                        farmer.style.left = (50 + 32 * Math.cos(angle)) + "%";
+                        farmer.style.top = (50 + 28 * Math.sin(angle)) + "%";
                         farmer.style.transform = "translate(-50%, -50%)";
                     } else {
                         const uIdx = unreadyPlayers.indexOf(id);
                         farmer.style.left = (5 + Math.floor(uIdx/5) * 15) + "%";
                         farmer.style.top = (5 + (uIdx%5) * 15) + "%";
-                        farmer.style.opacity = "0.5";
-                        farmer.style.filter = "grayscale(1)";
+                        farmer.style.opacity = "0.4";
                     }
                 } else {
                     farmer.style.left = (p.posX || 0) + "%";
                     farmer.style.top = (p.posY || 0) + "%";
                 }
 
-                // 訊息與表情
                 let bubbleHtml = "";
                 let face = p.avatar || "🧑‍🌾";
                 const vCount = gameState.voted_count_at_time?.[id];
                 
                 if (gameState.collided_players?.[id]) {
-                    bubbleHtml = `<div class="bubble">💀 貪心鬼</div>`;
+                    bubbleHtml = `<div class="bubble">💀 撞了</div>`;
                     face = "😵";
                 } else if (gameState.status === 'ENDED' && gameState.lastPlayerId === id && gameState.isLoserLone) {
-                    bubbleHtml = `<div class="bubble">🏜️ 可憐鬼</div>`;
+                    bubbleHtml = `<div class="bubble">🏜️ 可憐</div>`;
                     face = "🥺";
                 } else if (vCount) {
                     bubbleHtml = `<div class="bubble">😊 ${vCount}隻</div>`;
                 }
 
-                const kickAction = (imHostOrAdmin && id !== currentUser.userId) ? `<span onclick="kickPlayer('${id}')" style="color:red;font-weight:bold;margin-left:3px;">✕</span>` : "";
-                const simControls = (imHostOrAdmin && id.startsWith('sim_')) ? `
-                    <div style="display:flex;gap:2px;">
-                        <button class="test-btn" onclick="simulateReady('${id}', ${!p.isReady})">備</button>
-                        <button class="test-btn" onclick="simulatePress('${id}', '${p.name}')">拔</button>
-                    </div>` : "";
+                const isHost = (id === hostId);
+                const isAdmin = (id === ADMIN_UID);
+                const kickAction = (imHostOrAdmin && id !== currentUser.userId) ? `<span onclick="kickPlayer('${id}')" style="color:red;font-weight:bold;margin-left:3px;cursor:pointer;">✕</span>` : "";
 
-                // 下方名稱與標籤補回
+                // 名稱區塊標示房主與管理員
+                let nameClass = "farmer-name";
+                let roleIcon = "";
+                if (isAdmin) { nameClass += " admin-label"; roleIcon = "👑 "; }
+                else if (isHost) { nameClass += " host-label"; roleIcon = "🔵 "; }
+
                 farmer.innerHTML = `
                     ${bubbleHtml}
                     <div class="farmer-img">${face}</div>
-                    <div class="farmer-name ${id === hostId ? 'host-label' : ''}">
-                        ${id === hostId ? '🔵' : ''}${p.isReady ? '🔸' : ''}${p.name}${kickAction}
+                    <div class="${nameClass}">
+                        ${roleIcon}${p.isReady ? '🔸' : ''}${p.name}${kickAction}
                     </div>
-                    ${simControls}
                 `;
                 layer.appendChild(farmer);
             });
         }
 
-        function updateGameStatus(state) {
+        function updateGameStatus(state, imHostOrAdmin) {
             document.getElementById('bambooCount').innerText = state.count || 0;
-            const btn = document.getElementById('pressBtn');
-            const info = document.getElementById('statusInfo');
+            const centralBtn = document.getElementById('bambooFieldBtn');
+            const readyBtn = document.getElementById('readyBtn');
+            const hostStartBtn = document.getElementById('hostStartBtn');
+            const againBtn = document.getElementById('againBtn');
+            const statusLabel = document.getElementById('gameStatusLabel');
             
-            if (state.status === 'PLAYING') {
+            if (state.status === 'WAITING') {
+                readyBtn.classList.remove('grayscale');
+                hostStartBtn.style.display = imHostOrAdmin ? "inline-block" : "none";
+                hostStartBtn.classList.remove('grayscale');
+                againBtn.style.display = "none";
+                centralBtn.classList.add('grayscale');
+                statusLabel.innerText = "等待玩家準備...";
+            } else if (state.status === 'STARTING') {
+                readyBtn.classList.add('grayscale');
+                hostStartBtn.classList.add('grayscale');
+                statusLabel.innerText = "即將開拔，手放好！";
+            } else if (state.status === 'PLAYING') {
+                readyBtn.classList.add('grayscale');
+                hostStartBtn.style.display = "none";
                 const alreadyVoted = state.voted_players?.[currentUser.userId];
-                btn.className = `bamboo-btn ${(!myReadyState || alreadyVoted) ? 'grayscale' : ''}`;
-                info.innerText = myReadyState ? (alreadyVoted ? "已拔取，等結果" : "快拔！") : "非參與者觀戰中";
+                centralBtn.className = (!myReadyState || alreadyVoted) ? 'grayscale' : '';
+                statusLabel.innerText = myReadyState ? (alreadyVoted ? "已拔取，等結果" : "快點擊中間竹筍！") : "觀戰中";
             } else if (state.status === 'ENDED') {
-                btn.classList.add('grayscale');
-                info.innerText = "本輪結束";
-            } else {
-                btn.classList.add('grayscale');
-                info.innerText = state.status === 'STARTING' ? "倒數開拔..." : "準備中...";
+                readyBtn.classList.add('grayscale');
+                centralBtn.classList.add('grayscale');
+                againBtn.style.display = imHostOrAdmin ? "inline-block" : "none";
+                statusLabel.innerText = "本輪結束";
+            }
+            
+            if (imHostOrAdmin) {
+                document.getElementById('adminPanel').style.display = "block";
             }
         }
 
         function enterGame() {
             document.getElementById('loginCard').style.display = "none";
             document.getElementById('gameArea').style.display = "block";
+            const pos = getRandomPos();
             db.ref('online_players/' + currentUser.userId).set({ 
-                name: currentUser.displayName, isReady: false, avatar: myAvatar, posX: myInitPos.x, posY: myInitPos.y 
+                name: currentUser.displayName, isReady: false, avatar: myAvatar, posX: pos.x, posY: pos.y 
             });
             db.ref('online_players/' + currentUser.userId).onDisconnect().remove();
         }
 
         function toggleReady() {
+            if (document.getElementById('readyBtn').classList.contains('grayscale')) return;
             myReadyState = !myReadyState;
             db.ref('online_players/' + currentUser.userId + '/isReady').set(myReadyState);
         }
@@ -298,7 +294,7 @@
                         status: 'PLAYING', count: 0, lastTime: 0, 
                         voted_players: {}, voted_count_at_time: {}, collided_players: {} 
                     });
-                }, 2000 + Math.random() * 3000);
+                }, 1500 + Math.random() * 3000);
             });
         }
 
@@ -317,8 +313,7 @@
                     if (!curr.voted_players) curr.voted_players = {};
                     if (!curr.voted_count_at_time) curr.voted_count_at_time = {};
 
-                    // 撞筍判定
-                    if (curr.lastTime && (now - curr.lastTime < 800)) {
+                    if (curr.lastTime && (now - curr.lastTime < 500)) {
                         curr.status = 'ENDED';
                         if (!curr.collided_players) curr.collided_players = {};
                         curr.collided_players[curr.lastPlayerId] = true;
@@ -327,12 +322,10 @@
 
                     curr.count++;
                     curr.lastTime = now;
-                    curr.lastPlayer = name;
                     curr.lastPlayerId = uid;
                     curr.voted_players[uid] = true;
                     curr.voted_count_at_time[uid] = curr.count;
 
-                    // 可憐鬼判定
                     const votedCount = Object.keys(curr.voted_players).length;
                     if (curr.status !== 'ENDED' && votedCount === readyIds.length - 1 && readyIds.length > 1) {
                         const loserId = readyIds.find(id => !curr.voted_players[id]);
@@ -352,16 +345,14 @@
                 i.value = "";
             }
         }
-
         function clearChats() { if(confirm("確定清空聊天？")) db.ref('chats').remove(); }
         
         function resetEverything() {
-            if(confirm("確定重置遊戲？")) {
-                db.ref('game_state').set({ status: 'WAITING', count: 0 });
-                db.ref('online_players').once('value', s => {
-                    s.forEach(c => db.ref('online_players/'+c.key+'/isReady').set(false));
-                });
-            }
+            db.ref('game_state').set({ status: 'WAITING', count: 0 });
+            db.ref('online_players').once('value', s => {
+                s.forEach(c => db.ref('online_players/'+c.key+'/isReady').set(false));
+            });
+            myReadyState = false;
         }
 
         function addSimulatedPlayer() {
@@ -369,10 +360,7 @@
             const pos = getRandomPos();
             db.ref('online_players/' + id).set({ name: '農夫' + Math.floor(Math.random()*100), isReady: false, avatar: "🤖", posX: pos.x, posY: pos.y });
         }
-        function simulateReady(uid, s) { db.ref('online_players/' + uid + '/isReady').set(s); }
-        function simulatePress(uid, name) { executePress(uid, name); }
         function kickPlayer(id) { if(confirm("確定踢除？")) db.ref('online_players/' + id).remove(); }
-        
         init();
     </script>
 </body>
