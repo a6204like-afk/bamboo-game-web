@@ -3,96 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍：邏輯修復版</title>
+    <title>🎋 拔竹筍 2.0：打地鼠農場版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f1f8e9; margin: 0; padding: 10px; min-height: 100vh; }
+        
+        /* 農田區 */
         #farmMap {
-            width: 100%; height: 400px; background-color: #dcedc8; border: 4px solid #8bc34a;
-            border-radius: 20px; position: relative; overflow: hidden; margin: 5px auto;
+            width: 100%; height: 350px; background-color: #dcedc8; border: 4px solid #8bc34a;
+            border-radius: 20px 20px 0 0; position: relative; overflow: hidden; margin: 5px auto 0 auto;
             background-image: radial-gradient(#aed581 10%, transparent 11%); background-size: 30px 30px;
             touch-action: none;
         }
-        #bambooFieldBtn {
-            width: 110px; height: 110px; background: #8d6e63; border: 4px solid #6d4c41;
-            border-radius: 15px; position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 1; cursor: pointer;
-            box-shadow: 0 4px 0 #4e342e; transition: 0.1s; outline: none; padding: 0;
-        }
-        #bambooFieldBtn:active:not(.grayscale) { transform: translate(-50%, -48%); box-shadow: 0 1px 0 #4e342e; }
-        #bambooStatus { color: #fff; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 2px #000; }
 
-        .farmer { width: 80px; height: 120px; position: absolute; display: flex; flex-direction: column; align-items: center; z-index: 10; cursor: grab; user-select: none; }
-        .farmer-img { font-size: 35px; line-height: 1; pointer-events: none; }
-        .bubble {
-            position: absolute; top: -35px; background: #fff; border: 2px solid #4caf50;
-            padding: 2px 8px; border-radius: 12px; font-size: 13px; font-weight: 900;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2); white-space: nowrap; z-index: 15; pointer-events: none;
+        /* 下方等待/休息區 */
+        #waitingArea {
+            width: 100%; height: 100px; background-color: #fff; border: 4px solid #8bc34a;
+            border-top: none; border-radius: 0 0 20px 20px; position: relative; margin-bottom: 10px;
+            background-image: linear-gradient(to right, #f5f5f5 50%, #ffffff 50%);
         }
-        .farmer-name { font-size: 11px; background: rgba(255,255,255,0.9); padding: 1px 6px; border-radius: 5px; white-space: nowrap; margin-top: 4px; border: 1px solid #ddd; pointer-events: none; }
-        .host-label { border-color: #2196f3; background: #e3f2fd !important; color: #1976d2; font-weight: bold; }
-        .admin-label { border-color: #f44336; background: #ffebee !important; color: #d32f2f; font-weight: bold; }
+        .area-label { position: absolute; bottom: 5px; font-size: 10px; color: #999; font-weight: bold; }
+
+        /* 竹筍樣式 */
+        .bamboo-item {
+            position: absolute; font-size: 40px; cursor: pointer; z-index: 8;
+            transition: transform 0.2s; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn { from { transform: scale(0) rotate(-20deg); } to { transform: scale(1) rotate(0); } }
+
+        .farmer { 
+            width: 60px; height: 80px; position: absolute; display: flex; flex-direction: column; 
+            align-items: center; z-index: 10; cursor: grab; user-select: none;
+            transition: left 0.5s ease-out, top 0.5s ease-out; /* 平滑移動核心 */
+        }
+        .farmer-img { font-size: 30px; line-height: 1; pointer-events: none; }
+        .bubble {
+            position: absolute; top: -30px; background: #fff; border: 2px solid #4caf50;
+            padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 900;
+            white-space: nowrap; z-index: 15; pointer-events: none;
+        }
+        .farmer-name { font-size: 10px; background: rgba(255,255,255,0.9); padding: 1px 4px; border-radius: 4px; white-space: nowrap; border: 1px solid #ddd; pointer-events: none; }
+        .host-label { border-color: #2196f3; background: #e3f2fd !important; color: #1976d2; }
+        .admin-label { border-color: #f44336; background: #ffebee !important; color: #d32f2f; }
         
         .card { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto 20px auto; }
-        .grayscale { filter: grayscale(1); opacity: 0.4; pointer-events: none !important; }
+        .grayscale { filter: grayscale(1); opacity: 0.5; }
         .btn-ui { padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 5px; transition: 0.2s; }
         .btn-ready { background: #ff9800; color: white; }
         .btn-cancel { background: #f44336; color: white; }
         .btn-start { background: #2196f3; color: white; }
-        .btn-move { background: #9c27b0; color: white; }
-        .btn-again { background: #4caf50; color: white; font-size: 18px; box-shadow: 0 4px 0 #2e7d32; width: 80%; }
+        .btn-again { background: #4caf50; color: white; font-size: 18px; width: 80%; }
         
-        #chatBox { height: 100px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
-        .sim-ctrl-box { display: flex; gap: 2px; margin-top: 4px; pointer-events: auto; }
-        .sim-btn { padding: 2px 4px; font-size: 10px; cursor: pointer; background: #fff; border: 1px solid #bbb; border-radius: 4px; }
-        
-        /* 解決踢人按鈕點擊衝突 */
-        .kick-btn { color: red; margin-left: 5px; cursor: pointer; font-weight: bold; position: relative; z-index: 25; pointer-events: auto !important; }
+        #chatBox { height: 80px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
+        .kick-btn { color: red; margin-left: 3px; cursor: pointer; font-weight: bold; pointer-events: auto !important; }
     </style>
 </head>
 <body>
 
     <div id="loginCard" class="card">
-        <h2 id="welcomeName">🧑‍🌾 拔筍農場</h2> 
-        <div id="loginActions">
-            <button id="lineLoginBtn" class="btn-ui btn-start" onclick="liff.login()">登入 LINE</button>
-            <br><br>
-            <button id="enterGameBtn" class="btn-ui btn-start grayscale" onclick="enterGame()">進入田地</button>
-        </div>
+        <h2>🧑‍🌾 拔筍農場 2.0</h2> 
+        <button id="lineLoginBtn" class="btn-ui btn-start" onclick="liff.login()">登入 LINE</button>
+        <button id="enterGameBtn" class="btn-ui btn-start grayscale" onclick="enterGame()">進入田地</button>
     </div>
 
     <div id="gameArea" class="card" style="display:none;">
         <div id="farmMap">
-            <button id="bambooFieldBtn" class="grayscale" onclick="pressBamboo()">
-                <div style="font-size: 40px;">🎋</div>
-                <div id="bambooStatus"><span id="bambooCount">0</span> 隻竹筍</div>
-            </button>
+            <div id="bambooLayer"></div>
             <div id="playersLayer"></div>
         </div>
+        <div id="waitingArea">
+            <div class="area-label" style="left: 10px;">⬅️ 休息中 (未準備)</div>
+            <div class="area-label" style="right: 10px;">準備中 ➡️</div>
+        </div>
 
-        <div id="gameStatusLabel" style="font-weight: bold; color: #4caf50; margin: 5px 0; font-size: 14px;">等待玩家準備...</div>
+        <div id="gameStatusLabel" style="font-weight: bold; color: #4caf50; margin: 5px 0;">等待開拔...</div>
 
         <div id="controlPanel">
             <button id="readyBtn" class="btn-ui btn-ready" onclick="toggleReady()">準備好了</button>
-            <button id="moveModeBtn" class="btn-ui btn-move" onclick="toggleMoveMode()">移動農夫：關</button>
-            <button id="hostStartBtn" class="btn-ui btn-start" style="display:none;" onclick="hostStartGame()">開拔</button>
-            <button id="againBtn" class="btn-ui btn-again" style="display:none;" onclick="resetEverything()">再來一局！</button>
+            <button id="moveModeBtn" class="btn-ui" style="background:#9c27b0; color:white;" onclick="toggleMoveMode()">自由移動：關</button>
+            <button id="hostStartBtn" class="btn-ui btn-start" style="display:none;" onclick="hostStartGame()">開拔！</button>
+            <button id="againBtn" class="btn-ui btn-again" style="display:none;" onclick="resetEverything()">再來一局</button>
         </div>
 
         <div id="chatBox"></div>
-        <div style="display: flex; margin-bottom: 5px;">
-            <input type="text" id="chatInput" placeholder="輸入聊天..." style="flex:1; padding: 10px; border-radius: 20px; border: 1px solid #ccc;" onkeypress="if(event.keyCode==13) sendChat()">
-            <button onclick="sendChat()" style="background:#4caf50; color:white; border:none; border-radius:20px; padding:0 15px; margin-left:5px; font-weight:bold;">送出</button>
+        <div style="display: flex;">
+            <input type="text" id="chatInput" placeholder="聊兩句..." style="flex:1; padding: 10px; border-radius: 20px; border: 1px solid #ccc;">
+            <button onclick="sendChat()" class="btn-ui" style="background:#4caf50; color:white; margin:0 0 0 5px;">送出</button>
         </div>
 
-        <div id="adminPanel" style="display:none; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px;">
-            <div style="font-size: 11px; color: #f44336; font-weight: bold; margin-bottom: 5px;">👑 管理員後台</div>
-            <button class="btn-ui" style="font-size:10px; background:#e1f5fe;" onclick="addSimulatedPlayer()">➕ 增加模擬</button>
-            <button class="btn-ui" style="font-size:10px; background:#fff3e0;" onclick="clearChats()">🧹 清空聊天</button>
-            <button class="btn-ui" style="font-size:10px; background:#ffebee;" onclick="resetEverything()">🔄 重置遊戲</button>
+        <div id="adminPanel" style="display:none; border-top: 1px dashed #ccc; margin-top: 15px; padding-top: 10px;">
+            <div style="font-size: 11px; color: #f44336; font-weight: bold;">👑 管理員後台</div>
+            <button class="btn-ui" style="font-size:10px; background:#e1f5fe;" onclick="addSimulatedPlayer()">➕ 模擬人</button>
+            <button class="btn-ui" style="font-size:10px; background:#fff3e0;" onclick="clearChats()">🧹 清空</button>
         </div>
     </div>
 
@@ -105,8 +109,7 @@
             projectId: "bamboo-game",
             storageBucket: "bamboo-game.firebasestorage.app",
             messagingSenderId: "986027038887",
-            appId: "1:986027038887:web:d69613c79921b12f1a6382",
-            measurementId: "G-R7TYX0Q3XR"
+            appId: "1:986027038887:web:d69613c79921b12f1a6382"
         };
 
         firebase.initializeApp(firebaseConfig);
@@ -124,7 +127,6 @@
                 document.getElementById('lineLoginBtn').style.display = "none";
                 document.getElementById('enterGameBtn').classList.remove('grayscale');
                 currentUser = await liff.getProfile();
-                document.getElementById('welcomeName').innerText = "你好，" + currentUser.displayName;
                 startGlobalSync();
             }
         }
@@ -135,19 +137,17 @@
                 if (!data) return;
                 const players = data.online_players || {};
                 const gameState = data.game_state || { status: 'WAITING' };
-                const keys = Object.keys(players);
                 
                 if (inGame && !players[currentUser.userId]) {
-                    alert("你已被踢出農場或與伺服器斷開連接！");
-                    location.reload();
-                    return;
+                    alert("與伺服器斷開連接！"); location.reload(); return;
                 }
 
-                const hostId = keys[0];
+                const hostId = Object.keys(players)[0];
                 const isAdminUser = (currentUser.userId === ADMIN_UID);
                 myReadyState = players[currentUser.userId]?.isReady || false;
 
                 renderPlayers(players, hostId, gameState, isAdminUser);
+                renderBamboos(gameState.bamboos || {});
                 updateGameStatus(gameState, hostId === currentUser.userId, isAdminUser);
             });
 
@@ -161,15 +161,15 @@
         function renderPlayers(players, hostId, gameState, isAdminUser) {
             const layer = document.getElementById('playersLayer');
             const keys = Object.keys(players);
-            const readyPlayers = keys.filter(k => players[k].isReady);
-            const notReadyPlayers = keys.filter(k => !players[k].isReady); // 找出沒準備的人
             const isPlaying = gameState.status !== 'WAITING';
+            
+            // 分組統計
+            const notReadyKeys = keys.filter(k => !players[k].isReady);
+            const readyKeys = keys.filter(k => players[k].isReady);
 
             keys.forEach((id) => {
                 let farmer = document.getElementById('farmer_' + id);
                 const p = players[id];
-                if (!p) return;
-
                 if (!farmer) {
                     farmer = document.createElement('div');
                     farmer.id = 'farmer_' + id;
@@ -179,139 +179,148 @@
                     layer.appendChild(farmer);
                 }
 
-                // --- 位置邏輯修正 ---
+                // --- 2.0 佈局邏輯 ---
                 if (isPlaying) {
-                    if (p.isReady) {
-                        // 1. 準備好的人：繞圈
-                        const rIdx = readyPlayers.indexOf(id);
-                        const angle = (rIdx / readyPlayers.length) * 2 * Math.PI;
-                        farmer.style.left = (50 + 32 * Math.cos(angle)) + "%";
-                        farmer.style.top = (50 + 28 * Math.sin(angle)) + "%";
-                        farmer.style.transform = "translate(-50%, -50%)";
+                    // 遊戲中：有點到竹筍的在田裡，沒點到的在休息區
+                    if (p.targetX !== undefined) {
+                        farmer.style.left = p.targetX + "%";
+                        farmer.style.top = p.targetY + "%";
                         farmer.classList.remove('grayscale');
-                        farmer.style.zIndex = "5";
+                    } else if (p.isReady) {
+                        // 準備了但還沒點到：在休息區右側
+                        const idx = readyKeys.filter(k => !players[k].targetX).indexOf(id);
+                        farmer.style.left = (60 + (idx % 3) * 12) + "%";
+                        farmer.style.top = (82 + Math.floor(idx / 3) * 5) + "%"; // 移到 waiting區
+                        farmer.classList.remove('grayscale');
                     } else {
-                        // 2. 沒準備的人：遊戲開始時掃到左邊排隊
-                        const nrIdx = notReadyPlayers.indexOf(id);
-                        farmer.style.left = "5%"; // 固定在左邊 5% 的位置
-                        farmer.style.top = (10 + nrIdx * 15) + "%"; // 垂直依序排列
-                        farmer.style.transform = "none";
-                        farmer.classList.add('grayscale'); // 變灰階
-                        farmer.style.zIndex = "1";
+                        // 沒準備：在休息區左側灰階
+                        const idx = notReadyKeys.indexOf(id);
+                        farmer.style.left = (5 + (idx % 3) * 12) + "%";
+                        farmer.style.top = (82 + Math.floor(idx / 3) * 5) + "%";
+                        farmer.classList.add('grayscale');
                     }
                 } else {
-                    // 3. 等待中（非遊戲狀態）：顯示原本同步的拖拽座標
+                    // 等待中：自由位置
                     farmer.style.left = (p.posX || 0) + "%";
                     farmer.style.top = (p.posY || 0) + "%";
-                    farmer.style.transform = "none";
-                    farmer.classList.remove('grayscale');
-                    farmer.style.zIndex = "10";
+                    farmer.classList.toggle('grayscale', !p.isReady);
                 }
 
-                // --- 氣泡與標籤邏輯 (保持不變) ---
-                let bubbleHtml = "";
                 let face = p.avatar || "🧑‍🌾";
-                if (gameState.collided_players?.[id]) { bubbleHtml = `<div class="bubble">💀 貪心鬼</div>`; face = "😵"; }
-                else if (gameState.status === 'ENDED' && gameState.lastPlayerId === id && gameState.isLoserLone) { bubbleHtml = `<div class="bubble">🏜️ 可可憐憐</div>`; face = "🥺"; }
-                else if (gameState.voted_count_at_time?.[id]) { bubbleHtml = `<div class="bubble">😊 ${gameState.voted_count_at_time[id]}隻竹筍</div>`; }
+                let bubble = "";
+                if (p.targetX !== undefined) { face = "😊"; bubble = `<div class="bubble">拔到了！</div>`; }
+                if (gameState.status === 'ENDED' && gameState.lastPlayerId === id) { face = "🥺"; bubble = `<div class="bubble">嗚嗚...</div>`; }
 
-                const isHost = (id === hostId);
                 const isAdmin = (id === ADMIN_UID);
+                const isHost = (id === hostId);
                 const kickAction = (isAdminUser && id !== currentUser.userId) ? `<span class="kick-btn" onclick="event.stopPropagation(); kickPlayer('${id}')">✕</span>` : "";
+                
+                let nameClass = "farmer-name";
+                if (isAdmin) nameClass += " admin-label";
+                else if (isHost) nameClass += " host-label";
 
-                let nameClass = "farmer-name"; let roleIcon = "";
-                if (isAdmin) { nameClass += " admin-label"; roleIcon = "👑 "; }
-                else if (isHost) { nameClass += " host-label"; roleIcon = "🔵 "; }
+                farmer.innerHTML = `${bubble}<div class="farmer-img">${face}</div><div class="${nameClass}">${p.name}${kickAction}</div>`;
+            });
 
-                let simControls = "";
-                if (isAdminUser && id.startsWith('sim_')) {
-                    if (gameState.status === 'WAITING') {
-                        simControls = `<div class="sim-ctrl-box"><button class="sim-btn" onclick="simulateReady('${id}', ${!p.isReady})">${p.isReady ? '撤' : '備'}</button></div>`;
-                    } else if (gameState.status === 'PLAYING' && p.isReady && (!gameState.voted_players || !gameState.voted_players[id])) {
-                        simControls = `<div class="sim-ctrl-box"><button class="sim-btn" onclick="simulatePress('${id}', '${p.name}')">拔！</button></div>`;
+            Array.from(layer.children).forEach(child => { if (!players[child.id.replace('farmer_', '')]) child.remove(); });
+        }
+
+        function renderBamboos(bamboos) {
+            const layer = document.getElementById('bambooLayer');
+            const now = Date.now();
+            Object.keys(bamboos).forEach(bid => {
+                const b = bamboos[bid];
+                let elem = document.getElementById('bamboo_' + bid);
+                
+                // 只顯示還沒被拔走且時間已到的竹筍
+                if (!b.claimedBy && now >= b.appearAt) {
+                    if (!elem) {
+                        elem = document.createElement('div');
+                        elem.id = 'bamboo_' + bid;
+                        elem.className = 'bamboo-item';
+                        elem.innerText = "🎋";
+                        elem.style.left = b.x + "%";
+                        elem.style.top = b.y + "%";
+                        elem.onclick = () => claimBamboo(bid);
+                        layer.appendChild(elem);
                     }
+                } else if (elem) {
+                    elem.remove();
                 }
-
-                farmer.innerHTML = `${bubbleHtml}<div class="farmer-img">${face}</div><div class="${nameClass}">${roleIcon}${p.isReady ? '🔸' : ''}${p.name}${kickAction}</div>${simControls}`;
             });
-
+            // 清理已刪除的竹筍
             Array.from(layer.children).forEach(child => {
-                const id = child.id.replace('farmer_', '');
-                if (!players[id]) child.remove();
+                if (!bamboos[child.id.replace('bamboo_', '')]) child.remove();
             });
         }
 
-        function startDrag(e, id) {
-            // 修正：如果點擊的是踢人按鈕，不啟動拖曳
-            if (e.target.classList.contains('kick-btn')) return;
-            if (!isMoveMode) return;
-            const isAdmin = (currentUser.userId === ADMIN_UID);
-            if (id !== currentUser.userId && !(isAdmin && id.startsWith('sim_'))) return;
-            
-            dragTarget = id;
-            const moveHandler = (ev) => onDrag(ev);
-            const endHandler = () => {
-                dragTarget = null;
-                window.removeEventListener('mousemove', moveHandler);
-                window.removeEventListener('mouseup', endHandler);
-                window.removeEventListener('touchmove', moveHandler);
-                window.removeEventListener('touchend', endHandler);
-            };
-            window.addEventListener('mousemove', moveHandler);
-            window.addEventListener('mouseup', endHandler);
-            window.addEventListener('touchmove', moveHandler, { passive: false });
-            window.addEventListener('touchend', endHandler);
+        function claimBamboo(bid) {
+            if (myReadyState === false) return;
+            db.ref('game_state/bamboos/' + bid).transaction((bamboo) => {
+                if (bamboo && !bamboo.claimedBy) {
+                    bamboo.claimedBy = currentUser.userId;
+                    // 同步移動農夫
+                    db.ref('online_players/' + currentUser.userId).update({
+                        targetX: bamboo.x, targetY: bamboo.y
+                    });
+                    checkGameEnd();
+                    return bamboo;
+                }
+            });
         }
 
-        function onDrag(e) {
-            if (!dragTarget) return;
-            e.preventDefault();
-            const map = document.getElementById('farmMap');
-            const rect = map.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            let x = ((clientX - rect.left) / rect.width) * 100 - 5;
-            let y = ((clientY - rect.top) / rect.height) * 100 - 10;
-            x = Math.max(0, Math.min(90, x)); y = Math.max(0, Math.min(85, y));
-            db.ref('online_players/' + dragTarget).update({ posX: x, posY: y });
+        function checkGameEnd() {
+            db.ref('/').once('value', s => {
+                const data = s.val();
+                const players = data.online_players;
+                const bamboos = data.game_state.bamboos || {};
+                const readyIds = Object.keys(players).filter(k => players[k].isReady);
+                const claimedCount = Object.keys(bamboos).filter(k => bamboos[k].claimedBy).length;
+
+                if (claimedCount >= readyIds.length - 1 && data.game_state.status === 'PLAYING') {
+                    const loserId = readyIds.find(id => !players[id].targetX);
+                    db.ref('game_state').update({ status: 'ENDED', lastPlayerId: loserId });
+                }
+            });
         }
 
-        function toggleMoveMode() {
-            isMoveMode = !isMoveMode;
-            const btn = document.getElementById('moveModeBtn');
-            btn.innerText = "移動農夫：" + (isMoveMode ? "開" : "關");
-            btn.style.background = isMoveMode ? "#4caf50" : "#9c27b0";
+        function hostStartGame() {
+            db.ref('online_players').once('value', s => {
+                const players = s.val() || {};
+                const readyIds = Object.keys(players).filter(k => players[k].isReady);
+                if (readyIds.length < 2) { alert("至少需2人準備！"); return; }
+                
+                const bamboos = {};
+                const count = readyIds.length - 1;
+                for(let i=0; i<count; i++) {
+                    bamboos['b'+i] = {
+                        x: 10 + Math.random()*75,
+                        y: 10 + Math.random()*60,
+                        appearAt: Date.now() + 500 + Math.random()*3500,
+                        claimedBy: null
+                    };
+                }
+                db.ref('game_state').set({ status: 'PLAYING', bamboos: bamboos });
+                // 清除所有玩家之前的目標位置
+                readyIds.forEach(id => db.ref('online_players/'+id).update({ targetX: null, targetY: null }));
+            });
         }
 
         function updateGameStatus(state, imHost, imAdmin) {
-            document.getElementById('bambooCount').innerText = state.count || 0;
-            const centralBtn = document.getElementById('bambooFieldBtn');
-            const readyBtn = document.getElementById('readyBtn');
-            const hostStartBtn = document.getElementById('hostStartBtn');
-            const againBtn = document.getElementById('againBtn');
             const statusLabel = document.getElementById('gameStatusLabel');
-            
-            readyBtn.innerText = myReadyState ? "準備取消" : "準備好了";
-            readyBtn.className = "btn-ui " + (myReadyState ? "btn-cancel" : "btn-ready");
+            const againBtn = document.getElementById('againBtn');
+            const hostBtn = document.getElementById('hostStartBtn');
 
             if (state.status === 'WAITING') {
-                readyBtn.classList.remove('grayscale');
-                hostStartBtn.style.display = imHost ? "inline-block" : "none";
+                statusLabel.innerText = "等待玩家準備中...";
                 againBtn.style.display = "none";
-                centralBtn.classList.add('grayscale');
-                statusLabel.innerText = "等待玩家準備...";
-            } else if (state.status === 'ENDED') {
-                readyBtn.classList.add('grayscale');
-                centralBtn.classList.add('grayscale');
-                againBtn.style.display = (imHost || imAdmin) ? "inline-block" : "none";
-                statusLabel.innerText = "本輪結束";
+                hostBtn.style.display = imHost ? "inline-block" : "none";
+            } else if (state.status === 'PLAYING') {
+                statusLabel.innerText = "🎋 竹筍冒出來了！快拔！";
+                hostBtn.style.display = "none";
             } else {
-                readyBtn.classList.add('grayscale');
-                hostStartBtn.style.display = "none";
-                const isPlaying = state.status === 'PLAYING';
-                const alreadyVoted = state.voted_players?.[currentUser.userId];
-                centralBtn.className = (isPlaying && myReadyState && !alreadyVoted) ? '' : 'grayscale';
-                statusLabel.innerText = isPlaying ? (alreadyVoted ? "已拔取，等結果" : "快點擊中間竹筍！") : "倒數中...";
+                statusLabel.innerText = "遊戲結束！";
+                againBtn.style.display = (imHost || imAdmin) ? "inline-block" : "none";
             }
             document.getElementById('adminPanel').style.display = imAdmin ? "block" : "none";
         }
@@ -321,107 +330,67 @@
             document.getElementById('loginCard').style.display = "none";
             document.getElementById('gameArea').style.display = "block";
             db.ref('online_players/' + currentUser.userId).set({ 
-                name: currentUser.displayName, isReady: false, avatar: myAvatar, posX: Math.random()*80, posY: Math.random()*80 
+                name: currentUser.displayName, isReady: false, avatar: myAvatar, 
+                posX: 10 + Math.random()*80, posY: 82 
             });
             db.ref('online_players/' + currentUser.userId).onDisconnect().remove();
         }
 
         function toggleReady() {
-            if (document.getElementById('readyBtn').classList.contains('grayscale')) return;
             db.ref('online_players/' + currentUser.userId + '/isReady').set(!myReadyState);
         }
 
-        function hostStartGame() {
-            db.ref('online_players').once('value', (snap) => {
-                const players = snap.val() || {};
-                const readyCount = Object.keys(players).filter(k => players[k].isReady).length;
-                if (readyCount < 2) { alert("至少需 2 人準備！"); return; }
-                db.ref('game_state').set({ status: 'STARTING', count: 0, readyCount: readyCount });
-                setTimeout(() => {
-                    db.ref('game_state').set({ 
-                        status: 'PLAYING', 
-                        count: 0, 
-                        lastTime: 0, 
-                        voted_players: {}, 
-                        voted_count_at_time: {}, 
-                        collided_players: {},
-                        readyCount: readyCount 
-                    });
-                }, 1500 + Math.random() * 2000);
-            });
+        function toggleMoveMode() {
+            isMoveMode = !isMoveMode;
+            const btn = document.getElementById('moveModeBtn');
+            btn.innerText = "自由移動：" + (isMoveMode ? "開" : "關");
+            btn.style.background = isMoveMode ? "#4caf50" : "#9c27b0";
         }
 
-        // --- 核心邏輯修復：拔竹筍判定 ---
-        function pressBamboo(uidInput, nameInput) {
-            const uid = uidInput || currentUser.userId;
-            const now = Date.now();
-            
-            // 先獲取當前準備的人數列表
-            db.ref('online_players').once('value', (pSnap) => {
-                const players = pSnap.val() || {};
-                const readyIds = Object.keys(players).filter(k => players[k].isReady);
-                const totalReady = readyIds.length;
-
-                db.ref('game_state').transaction((curr) => {
-                    if (!curr || curr.status !== 'PLAYING' || curr.voted_players?.[uid]) return;
-                    
-                    if (!curr.voted_players) curr.voted_players = {};
-                    if (!curr.voted_count_at_time) curr.voted_count_at_time = {};
-                    if (!curr.collided_players) curr.collided_players = {};
-
-                    // 1. 碰撞判定 (800ms 內連續按下)
-                    if (curr.lastTime && (now - curr.lastTime < 400)) {
-                        curr.status = 'ENDED';
-                        curr.collided_players[curr.lastPlayerId] = true;
-                        curr.collided_players[uid] = true;
-                    }
-
-                    // 2. 正常拔取計數
-                    curr.count = (curr.count || 0) + 1;
-                    curr.lastTime = now;
-                    curr.lastPlayerId = uid;
-                    curr.voted_players[uid] = true;
-                    curr.voted_count_at_time[uid] = curr.count;
-
-                    // 3. 核心修正：判定是否剩最後一個人 (倒數第二個人按完)
-                    const votedCount = Object.keys(curr.voted_players).length;
-                    
-                    // 如果（已拔人數）等於（總準備人數 - 1），且目前還沒因為碰撞結束
-                    if (curr.status !== 'ENDED' && votedCount === totalReady - 1 && totalReady > 1) {
-                        const loserId = readyIds.find(id => !curr.voted_players[id]);
-                        if (loserId) {
-                            curr.status = 'ENDED';
-                            curr.lastPlayerId = loserId;
-                            curr.isLoserLone = true; // 觸發「可可憐憐」氣泡
-                        }
-                    }
-                    return curr;
-                });
-            });
+        function startDrag(e, id) {
+            if (e.target.classList.contains('kick-btn') || !isMoveMode) return;
+            dragTarget = id;
+            const moveHandler = (ev) => {
+                ev.preventDefault();
+                const rect = document.getElementById('farmMap').getBoundingClientRect();
+                const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+                const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+                let x = ((clientX - rect.left) / rect.width) * 100 - 5;
+                let y = ((clientY - rect.top) / rect.height) * 100 - 5;
+                db.ref('online_players/' + dragTarget).update({ posX: x, posY: y });
+            };
+            const endHandler = () => {
+                window.removeEventListener('mousemove', moveHandler);
+                window.removeEventListener('touchmove', moveHandler);
+            };
+            window.addEventListener('mousemove', moveHandler);
+            window.addEventListener('touchmove', moveHandler, { passive: false });
+            window.addEventListener('mouseup', endHandler);
+            window.addEventListener('touchend', endHandler);
         }
 
         function resetEverything() {
-            db.ref('game_state').set({ status: 'WAITING', count: 0 });
+            db.ref('game_state').set({ status: 'WAITING' });
             db.ref('online_players').once('value', s => {
-                const updates = {};
-                s.forEach(c => { updates[`online_players/${c.key}/isReady`] = false; });
-                db.ref().update(updates);
+                s.forEach(c => db.ref('online_players/' + c.key).update({ isReady: false, targetX: null, targetY: null }));
             });
         }
 
-        function sendChat() {
-            const i = document.getElementById('chatInput');
-            if (i.value.trim() && currentUser) { db.ref('chats').push({ name: currentUser.displayName, text: i.value }); i.value = ""; }
-        }
-        function clearChats() { if(confirm("確定清空聊天？")) db.ref('chats').remove(); }
         function addSimulatedPlayer() {
             const id = 'sim_' + Date.now();
-            db.ref('online_players/' + id).set({ name: '測試農夫' + Math.floor(Math.random()*100), isReady: false, avatar: "🤖", posX: Math.random()*80, posY: Math.random()*80 });
+            db.ref('online_players/' + id).set({ name: '機器人', isReady: true, avatar: "🤖", posX: Math.random()*80, posY: 82 });
         }
-        function simulateReady(uid, s) { db.ref('online_players/' + uid + '/isReady').set(s); }
-        function simulatePress(uid, name) { pressBamboo(uid, name); }
+        function sendChat() {
+            const i = document.getElementById('chatInput');
+            if (i.value.trim()) { db.ref('chats').push({ name: currentUser.displayName, text: i.value }); i.value = ""; }
+        }
         function kickPlayer(id) { if(confirm("確定踢除？")) db.ref('online_players/' + id).remove(); }
+
         init();
+        // 持續更新竹筍顯示（處理 appearAt 時間差）
+        setInterval(() => {
+            db.ref('game_state/bamboos').once('value', s => renderBamboos(s.val() || {}));
+        }, 500);
     </script>
 </body>
 </html>
