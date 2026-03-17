@@ -350,19 +350,40 @@
         function startDrag(e, id) {
             if (e.target.classList.contains('kick-btn') || !isMoveMode) return;
             dragTarget = id;
+
             const moveHandler = (ev) => {
                 ev.preventDefault();
-                const rect = document.getElementById('farmMap').getBoundingClientRect();
+                const map = document.getElementById('farmMap');
+                const rect = map.getBoundingClientRect();
+                
+                // 獲取目前觸控或滑鼠位置
                 const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
                 const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-                let x = ((clientX - rect.left) / rect.width) * 100 - 5;
+
+                // 計算百分比座標
+                let x = ((clientX - rect.left) / rect.width) * 100 - 5; // -5 是為了讓中心點對準手指
                 let y = ((clientY - rect.top) / rect.height) * 100 - 5;
-                db.ref('online_players/' + dragTarget).update({ posX: x, posY: y });
+
+                // --- 核心修正：邊界限制 ---
+                // 限制 X 在 0% ~ 92% 之間 (留一點寬度給農夫本體)
+                // 限制 Y 在 0% ~ 85% 之間 (避免農夫沒入底部或飛出頂部)
+                x = Math.max(0, Math.min(92, x));
+                y = Math.max(0, Math.min(85, y));
+
+                // 更新至 Firebase
+                db.ref('online_players/' + dragTarget).update({ 
+                    posX: x, 
+                    posY: y 
+                });
             };
+
             const endHandler = () => {
                 window.removeEventListener('mousemove', moveHandler);
                 window.removeEventListener('touchmove', moveHandler);
+                window.removeEventListener('mouseup', endHandler);
+                window.removeEventListener('touchend', endHandler);
             };
+
             window.addEventListener('mousemove', moveHandler);
             window.addEventListener('touchmove', moveHandler, { passive: false });
             window.addEventListener('mouseup', endHandler);
