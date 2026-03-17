@@ -213,7 +213,7 @@
                 let face = p.avatar || "🧑‍🌾";
                 if (gameState.collided_players?.[id]) { bubbleHtml = `<div class="bubble">💀 貪心鬼</div>`; face = "😵"; }
                 else if (gameState.status === 'ENDED' && gameState.lastPlayerId === id && gameState.isLoserLone) { bubbleHtml = `<div class="bubble">🏜️ 可可憐憐</div>`; face = "🥺"; }
-                else if (gameState.voted_count_at_time?.[id]) { bubbleHtml = `<div class="bubble">😊 ${gameState.voted_count_at_time[id]}隻</div>`; }
+                else if (gameState.voted_count_at_time?.[id]) { bubbleHtml = `<div class="bubble">😊 ${gameState.voted_count_at_time[id]}隻竹筍</div>`; }
 
                 const isHost = (id === hostId);
                 const isAdmin = (id === ADMIN_UID);
