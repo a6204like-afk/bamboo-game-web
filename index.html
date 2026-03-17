@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍：身分標示版</title>
+    <title>🎋 拔竹筍：測試功能回歸版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -26,18 +26,17 @@
         #bambooFieldBtn:active:not(.grayscale) { transform: translate(-50%, -48%); box-shadow: 0 1px 0 #4e342e; }
         #bambooStatus { color: #fff; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 2px #000; }
 
-        .farmer { width: 70px; height: 100px; position: absolute; transition: all 0.6s ease-out; display: flex; flex-direction: column; align-items: center; z-index: 2; }
+        .farmer { width: 80px; height: 120px; position: absolute; transition: all 0.6s ease-out; display: flex; flex-direction: column; align-items: center; z-index: 2; }
         .farmer-img { font-size: 35px; position: relative; line-height: 1; }
         
         .bubble {
-            position: absolute; top: -30px; background: #fff; border: 2px solid #4caf50;
+            position: absolute; top: -35px; background: #fff; border: 2px solid #4caf50;
             padding: 2px 8px; border-radius: 12px; font-size: 13px; font-weight: 900;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2); white-space: nowrap; z-index: 10; animation: bounce 0.5s ease;
         }
         @keyframes bounce { 0% { transform: scale(0.5); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
         .farmer-name { font-size: 11px; background: rgba(255,255,255,0.9); padding: 1px 6px; border-radius: 5px; white-space: nowrap; margin-top: 4px; border: 1px solid #ddd; }
-        /* 身分標籤樣式 */
         .host-label { border-color: #2196f3; background: #e3f2fd !important; color: #1976d2; font-weight: bold; }
         .admin-label { border-color: #f44336; background: #ffebee !important; color: #d32f2f; font-weight: bold; }
         
@@ -47,9 +46,15 @@
         .btn-ui { padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 5px; transition: 0.2s; }
         .btn-ready { background: #ff9800; color: white; }
         .btn-start { background: #2196f3; color: white; }
-        .btn-again { background: #4caf50; color: white; font-size: 18px; box-shadow: 0 4px 0 #2e7d32; width: 80%; }
+        .btn-again { background: #4caf50; color: white; font-size: 18px; box-shadow: 0 4px 0 #2e7d32; width: 80%; margin-top: 10px; }
         
         #chatBox { height: 80px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
+        
+        /* 模擬機器人專用按鈕樣式 */
+        .sim-ctrl-box { display: flex; gap: 2px; margin-top: 4px; }
+        .sim-btn { padding: 2px 4px; font-size: 10px; cursor: pointer; background: #fff; border: 1px solid #bbb; border-radius: 4px; font-weight: bold; }
+        .sim-btn-ready { color: #f57c00; }
+        .sim-btn-press { color: #388e3c; }
     </style>
 </head>
 <body>
@@ -87,9 +92,10 @@
         </div>
 
         <div id="adminPanel" style="display:none; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px;">
-            <button class="btn-ui" style="font-size:10px; background:#e1f5fe;" onclick="addSimulatedPlayer()">➕ 增加模擬</button>
-            <button class="btn-ui" style="font-size:10px; background:#fff3e0;" onclick="clearChats()">🧹 清空聊天</button>
-            <button class="btn-ui" style="font-size:10px; background:#ffebee;" onclick="resetEverything()">🔄 重置遊戲</button>
+            <div style="font-size: 11px; color: #999; margin-bottom: 5px;">管理員工具</div>
+            <button class="btn-ui" style="font-size:10px; background:#e1f5fe; padding: 5px 10px;" onclick="addSimulatedPlayer()">➕ 增加模擬</button>
+            <button class="btn-ui" style="font-size:10px; background:#fff3e0; padding: 5px 10px;" onclick="clearChats()">🧹 清空聊天</button>
+            <button class="btn-ui" style="font-size:10px; background:#ffebee; padding: 5px 10px;" onclick="resetEverything()">🔄 重置遊戲</button>
         </div>
     </div>
 
@@ -114,8 +120,8 @@
         
         function getRandomPos() {
             let x, y;
-            do { x = Math.random() * 80; } while (x > 35 && x < 65);
-            do { y = Math.random() * 80; } while (y > 35 && y < 65);
+            do { x = Math.random() * 80; } while (x > 30 && x < 70);
+            do { y = Math.random() * 80; } while (y > 30 && y < 70);
             return { x, y };
         }
 
@@ -202,21 +208,36 @@
                     bubbleHtml = `<div class="bubble">💀 撞了</div>`;
                     face = "😵";
                 } else if (gameState.status === 'ENDED' && gameState.lastPlayerId === id && gameState.isLoserLone) {
-                    bubbleHtml = `<div class="bubble">🏜️ 可憐</div>`;
+                    bubbleHtml = `<div class="bubble">🏜️ 可可憐憐</div>`;
                     face = "🥺";
                 } else if (vCount) {
-                    bubbleHtml = `<div class="bubble">😊 ${vCount}隻</div>`;
+                    bubbleHtml = `<div class="bubble">😊 ${vCount}隻竹筍</div>`;
                 }
 
-                const isHost = (id === hostId);
-                const isAdmin = (id === ADMIN_UID);
-                const kickAction = (imHostOrAdmin && id !== currentUser.userId) ? `<span onclick="kickPlayer('${id}')" style="color:red;font-weight:bold;margin-left:3px;cursor:pointer;">✕</span>` : "";
-
-                // 名稱區塊標示房主與管理員
+                // 房主與管理員標示
                 let nameClass = "farmer-name";
                 let roleIcon = "";
-                if (isAdmin) { nameClass += " admin-label"; roleIcon = "👑 "; }
-                else if (isHost) { nameClass += " host-label"; roleIcon = "🔵 "; }
+                if (id === ADMIN_UID) { nameClass += " admin-label"; roleIcon = "👑 "; }
+                else if (id === hostId) { nameClass += " host-label"; roleIcon = "🔵 "; }
+
+                const kickAction = (imHostOrAdmin && id !== currentUser.userId) ? `<span onclick="kickPlayer('${id}')" style="color:red;margin-left:3px;cursor:pointer;">✕</span>` : "";
+
+                // --- 模擬機器人控制按鈕 (回歸) ---
+                let simControls = "";
+                if (imHostOrAdmin && id.startsWith('sim_')) {
+                    // 根據遊戲狀態顯示不同按鈕
+                    if (gameState.status === 'WAITING') {
+                        simControls = `
+                        <div class="sim-ctrl-box">
+                            <button class="sim-btn sim-btn-ready" onclick="simulateReady('${id}', ${!p.isReady})">${p.isReady ? '撤' : '備'}</button>
+                        </div>`;
+                    } else if (gameState.status === 'PLAYING' && p.isReady && (!gameState.voted_players || !gameState.voted_players[id])) {
+                        simControls = `
+                        <div class="sim-ctrl-box">
+                            <button class="sim-btn sim-btn-press" onclick="simulatePress('${id}', '${p.name}')">拔！</button>
+                        </div>`;
+                    }
+                }
 
                 farmer.innerHTML = `
                     ${bubbleHtml}
@@ -224,6 +245,7 @@
                     <div class="${nameClass}">
                         ${roleIcon}${p.isReady ? '🔸' : ''}${p.name}${kickAction}
                     </div>
+                    ${simControls}
                 `;
                 layer.appendChild(farmer);
             });
@@ -240,14 +262,13 @@
             if (state.status === 'WAITING') {
                 readyBtn.classList.remove('grayscale');
                 hostStartBtn.style.display = imHostOrAdmin ? "inline-block" : "none";
-                hostStartBtn.classList.remove('grayscale');
                 againBtn.style.display = "none";
                 centralBtn.classList.add('grayscale');
                 statusLabel.innerText = "等待玩家準備...";
             } else if (state.status === 'STARTING') {
                 readyBtn.classList.add('grayscale');
                 hostStartBtn.classList.add('grayscale');
-                statusLabel.innerText = "即將開拔，手放好！";
+                statusLabel.innerText = "倒數中，手放好！";
             } else if (state.status === 'PLAYING') {
                 readyBtn.classList.add('grayscale');
                 hostStartBtn.style.display = "none";
@@ -261,9 +282,7 @@
                 statusLabel.innerText = "本輪結束";
             }
             
-            if (imHostOrAdmin) {
-                document.getElementById('adminPanel').style.display = "block";
-            }
+            if (imHostOrAdmin) document.getElementById('adminPanel').style.display = "block";
         }
 
         function enterGame() {
@@ -294,7 +313,7 @@
                         status: 'PLAYING', count: 0, lastTime: 0, 
                         voted_players: {}, voted_count_at_time: {}, collided_players: {} 
                     });
-                }, 1500 + Math.random() * 3000);
+                }, 2000 + Math.random() * 2000);
             });
         }
 
@@ -313,7 +332,7 @@
                     if (!curr.voted_players) curr.voted_players = {};
                     if (!curr.voted_count_at_time) curr.voted_count_at_time = {};
 
-                    if (curr.lastTime && (now - curr.lastTime < 500)) {
+                    if (curr.lastTime && (now - curr.lastTime < 800)) {
                         curr.status = 'ENDED';
                         if (!curr.collided_players) curr.collided_players = {};
                         curr.collided_players[curr.lastPlayerId] = true;
@@ -358,9 +377,14 @@
         function addSimulatedPlayer() {
             const id = 'sim_' + Date.now();
             const pos = getRandomPos();
-            db.ref('online_players/' + id).set({ name: '農夫' + Math.floor(Math.random()*100), isReady: false, avatar: "🤖", posX: pos.x, posY: pos.y });
+            db.ref('online_players/' + id).set({ name: '測試農夫' + Math.floor(Math.random()*100), isReady: false, avatar: "🤖", posX: pos.x, posY: pos.y });
         }
+
+        // 模擬控制 function
+        function simulateReady(uid, s) { db.ref('online_players/' + uid + '/isReady').set(s); }
+        function simulatePress(uid, name) { executePress(uid, name); }
         function kickPlayer(id) { if(confirm("確定踢除？")) db.ref('online_players/' + id).remove(); }
+        
         init();
     </script>
 </body>
