@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 3.3：管理員全權限版</title>
+    <title>🎋 拔竹筍 3.4：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 3.3</h2> 
+        <h2>🧑‍🌾 拔筍農場 3.4</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -130,18 +130,17 @@
                 const gameState = data.game_state || { status: 'WAITING' };
                 const hostId = Object.keys(players)[0];
 
-                // --- 強制結束監聽邏輯 ---
+                // --- 強制監聽結束邏輯：不論誰拔到，只要數據達標就結束 ---
                 if (gameState.status === 'PLAYING') {
                     const readyIds = Object.keys(players).filter(k => players[k].isReady);
                     const allBamboos = gameState.bamboos || {};
                     const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
                     
-                    // 只要準備人數 > 1 且 拔到的筍子數量 >= (人數-1)
+                    // 只要拔到的數量 >= 總人數-1
                     if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
-                        // 只有房長或是管理員負責寫入狀態，避免衝突
+                        // 由管理員或房長執行最後一擊，更新資料庫狀態
                         if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
                             const loserId = readyIds.find(id => players[id].targetX == null);
-                            // 只有在狀態還沒變成 ENDED 時才更新
                             db.ref('game_state').update({ 
                                 status: 'ENDED', 
                                 lastPlayerId: loserId || readyIds[0] 
@@ -150,7 +149,6 @@
                         }
                     }
                 }
-                // ----------------------
 
                 renderPlayers(players, hostId, gameState);
                 renderBamboos(gameState.bamboos || {});
@@ -419,23 +417,21 @@
             db.ref('/').once('value', s => {
                 const data = s.val();
                 if (!data || data.game_state?.status !== 'PLAYING') return;
+                
                 const players = data.online_players;
                 const bamboos = data.game_state.bamboos || {};
                 
-                let hasClaimed = false;
                 Object.keys(players).forEach(pid => {
+                    // 機器人還沒搶到，且場上有筍子
                     if (pid.startsWith('sim_') && players[pid].isReady && players[pid].targetX == null) {
                         const bId = Object.keys(bamboos).find(bid => !bamboos[bid].claimedBy && Date.now() >= bamboos[bid].appearAt);
                         if (bId) {
-                            claimBamboo(bId, pid);
-                            hasClaimed = true;
+                            claimBamboo(bId, pid); // 僅執行搶筍
                         }
                     }
                 });
-                // 如果這輪機器人有搶到筍，額外跑一次檢查
-                if (hasClaimed) checkEndCondition();
             });
-        }, 1500);
+        }, 1000); // 縮短到1秒，讓反應更快
 
         init();
     </script>
