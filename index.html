@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 2.8：管理員全權限版</title>
+    <title>🎋 拔竹筍 2.9：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 2.8</h2> 
+        <h2>🧑‍🌾 拔筍農場 2.9</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -276,23 +276,25 @@
         function checkEndCondition() {
             db.ref('/').once('value', s => {
                 const data = s.val();
+                if (!data || data.game_state.status !== 'PLAYING') return; // 防呆：確保只在遊戲中判斷
+
                 const players = data.online_players;
                 const readyIds = Object.keys(players).filter(k => players[k].isReady);
-                const bamboos = data.game_state.bamboos || {};
-                const claimedCount = Object.keys(bamboos).filter(k => bamboos[k].claimedBy).length;
+                const allBamboos = data.game_state.bamboos || {};
+                // 取得目前已被佔有的筍子數量
+                const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
 
-                // 修改：只要搶到的數量達到 (準備人數-1)，就強制結束
+                // 關鍵修正：將 === 改為 >=，並確保至少有 2 人在玩
                 if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
-                    // 找出那個還沒搶到筍子的人 (不論是人還是機器人)
+                    // 找出最後一個還沒搶到的人（targetX 還是 null 的人）
                     const loserId = readyIds.find(id => players[id].targetX == null);
                     
-                    if (loserId) {
-                        db.ref('game_state').update({ 
-                            status: 'ENDED', 
-                            lastPlayerId: loserId 
-                        });
-                        clearInterval(gameTimer);
-                    }
+                    // 只要條件達成，強制將狀態改為 ENDED
+                    db.ref('game_state').update({ 
+                        status: 'ENDED', 
+                        lastPlayerId: loserId || readyIds[0] // 如果都搶到了，就抓第一個當保險
+                    });
+                    if (gameTimer) clearInterval(gameTimer);
                 }
             });
         }
