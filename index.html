@@ -196,12 +196,17 @@
 
                 farmer.className = `farmer ${ (gameState.status === 'WAITING' && p.isReady) ? 'is-ready' : ''}`;
                 let face = p.avatar || "👨‍🌾";
-                if (p.targetX != null) face = "😊";
-                if (gameState.status === 'ENDED' && (gameState.lastPlayerId === id || (gameState.isTimeout && !p.targetX && p.isReady))) face = "🥺";
+                // 判斷是否為輸家：遊戲結束且沒有搶到筍子 (targetX 為空)
+                const isLoser = (gameState.status === 'ENDED' && p.targetX == null && p.isReady);
 
+                if (p.targetX != null) {
+                    face = "😊"; // 搶到的人笑臉
+                } else if (isLoser) {
+                    face = "🥺"; // 沒搶到的人哭臉
+                }
+
+                // 泡泡顯示：搶到才顯示「拔到了!」，輸家不顯示
                 const bubble = p.targetX != null ? `<div class="bubble">我的竹筍!</div>` : "";
-                const isAdmin = (currentUser.userId === ADMIN_UID);
-                const kickBtn = (isAdmin && id !== currentUser.userId) ? `<span class="kick-btn" onclick="kickPlayer('${id}')">✕</span>` : "";
                 
                 // 修正：補回機器人控制按鈕渲染
                 let simCtrl = "";
@@ -356,10 +361,15 @@
             document.getElementById('moveModeBtn').className = "btn-ui " + (isMoveMode ? "btn-move-on" : "btn-move-off");
             const againBtn = document.getElementById('againBtn');
             if (state.status === 'ENDED') {
+                // 只要是管理員或是房長，在結束後都能看到按鈕
                 againBtn.style.display = (isHost || isAdmin) ? 'inline-block' : 'none';
                 document.getElementById('gameStatusLabel').innerText = "遊戲結束！";
+                document.getElementById('gameStatusLabel').style.color = "#f44336"; // 變紅色較醒目
             } else {
                 againBtn.style.display = 'none';
+                if (state.status === 'PLAYING') {
+                    document.getElementById('gameStatusLabel').innerText = "快搶！";
+                }
             }
         }
 
