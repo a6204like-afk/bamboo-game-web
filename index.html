@@ -38,6 +38,10 @@
         .btn-ready { background: #ff9800; color: white; }
         .btn-ready.active { background: #f44336; }
         .btn-ui:disabled { background: #ccc !important; cursor: not-allowed; }
+        /* 關閉時：灰色 */
+        .btn-move-off { background: #78909c !important; color: white; }
+        /* 開啟時：紫色或綠色 */
+        .btn-move-on { background: #9c27b0 !important; color: white; box-shadow: 0 0 10px rgba(156, 39, 176, 0.5); }
         #chatBox { height: 80px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
         #timerLabel { font-size: 22px; color: #f44336; font-weight: bold; height: 35px; }
         .sim-ctrl { display: flex; gap: 2px; margin-top: 2px; z-index: 20; }
@@ -177,7 +181,8 @@
                 if (p.targetX != null) face = "😊";
                 if (gameState.status === 'ENDED' && (gameState.lastPlayerId === id || (gameState.isTimeout && !p.targetX && p.isReady))) face = "🥺";
 
-                const bubble = p.targetX != null ? `<div class="bubble">拔到了!</div>` : "";
+                const playerBamboos = Object.values(gameState.bamboos || {}).filter(b => b.claimedBy === id).length;
+                const bubble = playerBamboos > 0 ? `<div class="bubble">${playerBamboos}隻竹筍</div>` : "";
                 const isAdmin = (currentUser.userId === ADMIN_UID);
                 const kickBtn = (isAdmin && id !== currentUser.userId) ? `<span class="kick-btn" onclick="kickPlayer('${id}')">✕</span>` : "";
                 
@@ -227,7 +232,10 @@
 
         function toggleMoveMode() {
             isMoveMode = !isMoveMode;
-            document.getElementById('moveModeBtn').innerText = "自由移動：" + (isMoveMode ? "開" : "關");
+            const btn = document.getElementById('moveModeBtn');
+            btn.innerText = "自由移動：" + (isMoveMode ? "開" : "關");
+            // 切換 Class
+            btn.className = "btn-ui " + (isMoveMode ? "btn-move-on" : "btn-move-off");
         }
 
         function renderBamboos(bamboos) {
@@ -317,6 +325,7 @@
             document.getElementById('againBtn').style.display = ((isHost || isAdmin) && state.status === 'ENDED') ? 'inline-block' : 'none';
             document.getElementById('waitingArea').style.display = (state.status !== 'WAITING') ? 'flex' : 'none';
             document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('moveModeBtn').className = "btn-ui " + (isMoveMode ? "btn-move-on" : "btn-move-off");
         }
 
         function toggleReady() {
