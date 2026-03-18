@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 3.1：管理員全權限版</title>
+    <title>🎋 拔竹筍 3.2：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 3.1</h2> 
+        <h2>🧑‍🌾 拔筍農場 3.2</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -164,6 +164,8 @@
             const readyPlayers = playerIds.filter(id => players[id].isReady);
             const idlePlayers = playerIds.filter(id => !players[id].isReady);
 
+            const isAdmin = (currentUser.userId === ADMIN_UID);
+
             playerIds.forEach(id => {
                 let farmer = document.getElementById('farmer_' + id);
                 if (!farmer) {
@@ -207,6 +209,8 @@
 
                 // 泡泡顯示：搶到才顯示「拔到了!」，輸家不顯示
                 const bubble = p.targetX != null ? `<div class="bubble">我的竹筍!</div>` : "";
+                const kickBtn = (isAdmin && id !== currentUser.userId) ? 
+                    `<span class="kick-btn" onclick="event.stopPropagation(); kickPlayer('${id}')">✕</span>` : "";
                 
                 // 修正：補回機器人控制按鈕渲染
                 let simCtrl = "";
