@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 3.5：管理員全權限版</title>
+    <title>🎋 拔竹筍 3.6：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 3.5</h2> 
+        <h2>🧑‍🌾 拔筍農場 3.6</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -103,6 +103,8 @@
         let currentUser = { userId: "guest_" + Math.floor(Math.random()*1000), displayName: "遊客" };
         let isMoveMode = false;
         let gameTimer = null;
+        let activeMoveHandler = null;
+        let activeEndHandler = null;
 
         async function init() {
             try {
@@ -232,39 +234,53 @@
         // --- 移動邏輯：Admin 擁有全權限 ---
         function startDrag(e, id) {
             const isAdmin = (currentUser.userId === ADMIN_UID);
-            // 只有開啟移動模式，且是Admin或是移動自己時才觸發
             if (!isMoveMode) return;
             if (!isAdmin && id !== currentUser.userId) return;
 
-            window.removeEventListener('mousemove', window.activeMoveHandler);
-            window.removeEventListener('touchmove', window.activeMoveHandler);
+            // 1. 防呆：如果前一個拖拽還沒結束，強制清理
+            if (activeMoveHandler) {
+                window.removeEventListener('mousemove', activeMoveHandler);
+                window.removeEventListener('touchmove', activeMoveHandler);
+                window.removeEventListener('mouseup', activeEndHandler);
+                window.removeEventListener('touchend', activeEndHandler);
+            }
 
             const farmer = document.getElementById('farmer_' + id);
             farmer.classList.add('dragging');
 
-            const wrapper = document.getElementById('gameWrapper').getBoundingClientRect();
-            const moveHandler = (ev) => {
+            const mapRect = document.getElementById('farmMap').getBoundingClientRect();
+            activeMoveHandler = (ev) => {
+                // 阻止手機預設捲動
                 if (ev.cancelable) ev.preventDefault();
 
-                const rect = document.getElementById('farmMap').getBoundingClientRect();
                 const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
                 const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-                let x = Math.max(0, Math.min(90, ((clientX - wrapper.left) / wrapper.width) * 100 - 5));
-                let y = Math.max(0, Math.min(90, ((clientY - wrapper.top) / wrapper.height) * 100 - 5));
+
+                // 計算相對於 farmMap 的百分比位置
+                // 減去 5 是為了讓手指落在農夫中心 (農夫寬約 10%)
+                let x = ((clientX - mapRect.left) / mapRect.width) * 100 - 5;
+                let y = ((clientY - mapRect.top) / mapRect.height) * 100 - 7;
+
+                // 邊界限制：不超出地圖 0~90%
+                x = Math.max(0, Math.min(90, x));
+                y = Math.max(0, Math.min(90, y));
+
                 db.ref('online_players/' + id).update({ posX: x, posY: y });
             };
-            const endHandler = () => {
+            activeEndHandler = () => {
                 farmer.classList.remove('dragging');
-                window.removeEventListener('mousemove', window.activeMoveHandler);
-                window.removeEventListener('touchmove', window.activeMoveHandler, { passive: false });
-                window.removeEventListener('mouseup', endHandler);
-                window.removeEventListener('touchend', endHandler);
-                window.activeMoveHandler = null; // 清空
+                window.removeEventListener('mousemove', activeMoveHandler);
+                window.removeEventListener('touchmove', activeMoveHandler, { passive: false });
+                window.removeEventListener('mouseup', activeEndHandler);
+                window.removeEventListener('touchend', activeEndHandler);
+                activeMoveHandler = null;
+                activeEndHandler = null;
             };
-            window.addEventListener('mousemove', moveHandler);
-            window.addEventListener('touchmove', moveHandler, { passive: false });
-            window.addEventListener('mouseup', endHandler);
-            window.addEventListener('touchend', endHandler);
+
+            window.addEventListener('mousemove', activeMoveHandler);
+            window.addEventListener('touchmove', activeMoveHandler, { passive: false });
+            window.addEventListener('mouseup', activeEndHandler);
+            window.addEventListener('touchend', activeEndHandler);
         }
 
         function toggleMoveMode() {
@@ -298,14 +314,15 @@
 
         function claimBamboo(bid, simId = null) {
             const uid = simId || currentUser.userId;
-            // 移除外層的 once('value')，直接執行交易
             db.ref('game_state/bamboos/' + bid).transaction(b => {
                 if (b && !b.claimedBy) {
                     b.claimedBy = uid;
-                    // 同時更新玩家位置
                     db.ref('online_players/' + uid).update({ targetX: b.x, targetY: b.y });
                     return b;
                 }
+            }, (error, committed) => {
+                // 修正：拔完筍後，如果成功，主動跑一次結束檢查，不乾等資料庫同步
+                if (committed) checkEndCondition(); 
             });
         }
 
