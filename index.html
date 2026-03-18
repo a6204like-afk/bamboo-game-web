@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 2.9：管理員全權限版</title>
+    <title>🎋 拔竹筍 3.0：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 2.9</h2> 
+        <h2>🧑‍🌾 拔筍農場 3.0</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -129,6 +129,24 @@
                 const players = data.online_players || {};
                 const gameState = data.game_state || { status: 'WAITING' };
                 const hostId = Object.keys(players)[0];
+                if (gameState.status === 'PLAYING') {
+                    const readyIds = Object.keys(players).filter(k => players[k].isReady);
+                    const allBamboos = gameState.bamboos || {};
+                    const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
+                    
+                    // 只要準備人數 > 1 且 拔到的筍子 >= 人數-1
+                    if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
+                        // 只有房長（Host）或管理員負責寫入結束狀態，避免多人重複寫入
+                        if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
+                            const loserId = readyIds.find(id => players[id].targetX == null);
+                            db.ref('game_state').update({ 
+                                status: 'ENDED', 
+                                lastPlayerId: loserId || readyIds[0] 
+                            });
+                            if (gameTimer) clearInterval(gameTimer);
+                        }
+                    }
+                }
                 renderPlayers(players, hostId, gameState);
                 renderBamboos(gameState.bamboos || {});
                 updateUI(gameState, hostId === currentUser.userId);
