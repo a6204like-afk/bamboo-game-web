@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 2.7：管理員全權限版</title>
+    <title>🎋 拔竹筍 2.8：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 2.7</h2> 
+        <h2>🧑‍🌾 拔筍農場 2.8</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -278,11 +278,21 @@
                 const data = s.val();
                 const players = data.online_players;
                 const readyIds = Object.keys(players).filter(k => players[k].isReady);
-                const claimedCount = Object.keys(data.game_state.bamboos || {}).filter(k => data.game_state.bamboos[k].claimedBy).length;
-                if (readyIds.length > 1 && claimedCount === readyIds.length - 1) {
+                const bamboos = data.game_state.bamboos || {};
+                const claimedCount = Object.keys(bamboos).filter(k => bamboos[k].claimedBy).length;
+
+                // 修改：只要搶到的數量達到 (準備人數-1)，就強制結束
+                if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
+                    // 找出那個還沒搶到筍子的人 (不論是人還是機器人)
                     const loserId = readyIds.find(id => players[id].targetX == null);
-                    db.ref('game_state').update({ status: 'ENDED', lastPlayerId: loserId });
-                    clearInterval(gameTimer);
+                    
+                    if (loserId) {
+                        db.ref('game_state').update({ 
+                            status: 'ENDED', 
+                            lastPlayerId: loserId 
+                        });
+                        clearInterval(gameTimer);
+                    }
                 }
             });
         }
