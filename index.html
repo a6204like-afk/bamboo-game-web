@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 3.0：管理員全權限版</title>
+    <title>🎋 拔竹筍 3.1：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 3.0</h2> 
+        <h2>🧑‍🌾 拔筍農場 3.1</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -302,15 +302,14 @@
                 // 取得目前已被佔有的筍子數量
                 const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
 
-                // 關鍵修正：將 === 改為 >=，並確保至少有 2 人在玩
-                if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
-                    // 找出最後一個還沒搶到的人（targetX 還是 null 的人）
+                // 關鍵修正：改用 >=，且只要場上沒筍了也得結束
+                if (readyIds.length > 1 && (claimedCount >= readyIds.length - 1)) {
+                    // 找出那個還沒搶到的人 (targetX 還是 null 的)
                     const loserId = readyIds.find(id => players[id].targetX == null);
                     
-                    // 只要條件達成，強制將狀態改為 ENDED
                     db.ref('game_state').update({ 
                         status: 'ENDED', 
-                        lastPlayerId: loserId || readyIds[0] // 如果都搶到了，就抓第一個當保險
+                        lastPlayerId: loserId || readyIds[0] // 防呆：如果都搶到了，抓第一個
                     });
                     if (gameTimer) clearInterval(gameTimer);
                 }
@@ -355,6 +354,13 @@
             document.getElementById('waitingArea').style.display = (state.status !== 'WAITING') ? 'flex' : 'none';
             document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
             document.getElementById('moveModeBtn').className = "btn-ui " + (isMoveMode ? "btn-move-on" : "btn-move-off");
+            const againBtn = document.getElementById('againBtn');
+            if (state.status === 'ENDED') {
+                againBtn.style.display = (isHost || isAdmin) ? 'inline-block' : 'none';
+                document.getElementById('gameStatusLabel').innerText = "遊戲結束！";
+            } else {
+                againBtn.style.display = 'none';
+            }
         }
 
         function toggleReady() {
@@ -398,12 +404,19 @@
                 if (!data || data.game_state?.status !== 'PLAYING') return;
                 const players = data.online_players;
                 const bamboos = data.game_state.bamboos || {};
+                
+                let hasClaimed = false;
                 Object.keys(players).forEach(pid => {
                     if (pid.startsWith('sim_') && players[pid].isReady && players[pid].targetX == null) {
                         const bId = Object.keys(bamboos).find(bid => !bamboos[bid].claimedBy && Date.now() >= bamboos[bid].appearAt);
-                        if (bId) claimBamboo(bId, pid);
+                        if (bId) {
+                            claimBamboo(bId, pid);
+                            hasClaimed = true;
+                        }
                     }
                 });
+                // 如果這輪機器人有搶到筍，額外跑一次檢查
+                if (hasClaimed) checkEndCondition();
             });
         }, 1500);
 
