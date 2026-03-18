@@ -181,8 +181,7 @@
                 if (p.targetX != null) face = "😊";
                 if (gameState.status === 'ENDED' && (gameState.lastPlayerId === id || (gameState.isTimeout && !p.targetX && p.isReady))) face = "🥺";
 
-                const playerBamboos = Object.values(gameState.bamboos || {}).filter(b => b.claimedBy === id).length;
-                const bubble = playerBamboos > 0 ? `<div class="bubble">${playerBamboos}隻竹筍</div>` : "";
+                const bubble = p.targetX != null ? `<div class="bubble">我的竹筍!</div>` : "";
                 const isAdmin = (currentUser.userId === ADMIN_UID);
                 const kickBtn = (isAdmin && id !== currentUser.userId) ? `<span class="kick-btn" onclick="kickPlayer('${id}')">✕</span>` : "";
                 
