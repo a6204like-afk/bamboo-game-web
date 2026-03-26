@@ -158,7 +158,15 @@
             });
             db.ref('chats').limitToLast(10).on('value', s => {
                 const box = document.getElementById('chatBox'); box.innerHTML = "";
-                s.forEach(c => { const m = c.val(); box.innerHTML += `<div><b>${m.name}:</b> ${m.text}</div>`; });
+                s.forEach(c => {
+                    const m = c.val();
+                    const div = document.createElement('div');
+                    const b = document.createElement('b');
+                    b.textContent = m.name + ':';
+                    div.appendChild(b);
+                    div.appendChild(document.createTextNode(' ' + m.text));
+                    box.appendChild(div);
+                });
                 box.scrollTop = box.scrollHeight;
             });
         }
