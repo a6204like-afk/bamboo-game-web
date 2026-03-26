@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 3.7：管理員全權限版</title>
+    <title>🎋 拔竹筍 3.8：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 3.7</h2> 
+        <h2>🧑‍🌾 拔筍農場 3.8</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -109,8 +109,18 @@
         async function init() {
             try {
                 await liff.init({ liffId: "2009477552-iCxgtKls" });
-                if (liff.isLoggedIn()) { currentUser = await liff.getProfile(); }
-            } catch (e) { console.log("Guest Mode"); }
+                if (!liff.isLoggedIn()) {
+                    // 瀏覽器開啟時，導向 LINE 登入頁，授權後跳回原頁面
+                    liff.login({ redirectUri: location.href });
+                    return; // 等跳轉，不繼續執行
+                }
+                currentUser = await liff.getProfile();
+            } catch (e) {
+                console.error("LIFF init failed:", e);
+                // 只有在 LIFF 完全無法初始化時才降級為遊客（例如本地開發）
+                document.getElementById('loginCard').querySelector('h2').innerText = "⚠️ 請透過 LINE 開啟此頁面";
+                document.getElementById('enterGameBtn').disabled = true;
+            }
         }
 
         function enterGame() {
