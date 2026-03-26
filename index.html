@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎋 拔竹筍 3.6：管理員全權限版</title>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f1f8e9; margin: 0; padding: 10px; min-height: 100vh; overscroll-behavior: none; overflow: hidden; touch-action: pan-x pan-y;}
+        #farmMap {
+            width: 100%; height: 350px; background-color: #dcedc8; border: 4px solid #8bc34a;
+            border-radius: 20px 20px 0 0; position: relative; overflow: hidden; margin: 5px auto 0 auto;
+            background-image: radial-gradient(#aed581 10%, transparent 11%); background-size: 30px 30px;
+            touch-action: none;
+        }
+        #waitingArea {
+            width: 100%; height: 100px; background-color: #fff; border: 4px solid #8bc34a;
+            border-top: none; border-radius: 0 0 20px 20px; position: relative; margin-bottom: 10px;
+            display: none;
+            background-image: linear-gradient(to right, #f9f9f9 49%, #8bc34a 50%, #f9f9f9 51%);
+        }
+        .area-box { width: 48%; position: relative; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .area-label { position: absolute; top: 5px; font-size: 12px; color: #666; font-weight: bold; }
+        .bamboo-item { position: absolute; font-size: 40px; cursor: pointer; z-index: 100; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+        .farmer { width: 60px; height: 95px; position: absolute; display: flex; flex-direction: column; align-items: center; z-index: 10; transition: all 0.4s ease-out; pointer-events: auto; touch-action: none !important; -webkit-touch-callout: none; user-select: none;}
+        .farmer.dragging { transition: none; z-index: 1000; scale: 1.1; }
+        .farmer.is-ready { background: rgba(255, 235, 59, 0.4); border: 2px solid #fbc02d; border-radius: 10px; box-shadow: 0 0 15px rgba(251, 192, 45, 0.6); }
+        .farmer.not-ready { filter: grayscale(0.5); }
+        .bubble { position: absolute; top: -35px; background: #fff; border: 2px solid #4caf50; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 900; z-index: 15; white-space: nowrap; }
+        .farmer-name { font-size: 10px; background: rgba(255,255,255,0.9); padding: 2px 4px; border-radius: 4px; border: 1px solid #ddd; width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .host-label { border-color: #2196f3; background: #e3f2fd !important; color: #1976d2; }
+        .kick-btn { color: red; font-weight: bold; margin-left: 3px; cursor: pointer; pointer-events: auto; position: relative; z-index: 1100;}
+        .card { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto 20px auto; }
+        .btn-ui { padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 5px; }
+        .btn-ready { background: #ff9800; color: white; }
+        .btn-ready.active { background: #f44336; }
+        .btn-ui:disabled { background: #ccc !important; cursor: not-allowed; }
+        /* 關閉時：灰色 */
+        .btn-move-off { background: #78909c !important; color: white; }
+        /* 開啟時：紫色或綠色 */
+        .btn-move-on { background: #9c27b0 !important; color: white; box-shadow: 0 0 10px rgba(156, 39, 176, 0.5); }
+        #chatBox { height: 80px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; text-align: left; padding: 8px; font-size: 12px; background: #fafafa; margin: 10px 0; }
+        #timerLabel { font-size: 22px; color: #f44336; font-weight: bold; height: 35px; }
+        .sim-ctrl { display: flex; gap: 2px; margin-top: 2px; z-index: 20; }
+        .sim-btn { font-size: 9px; padding: 2px 4px; background: #fff; border: 1px solid #ccc; border-radius: 3px; cursor: pointer; pointer-events: auto; }
+    </style>
+</head>
+<body>
+
+    <div id="loginCard" class="card">
+        <h2>🧑‍🌾 拔筍農場 3.6</h2> 
+        <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
+    </div>
+
+    <div id="gameArea" class="card" style="display:none;">
+        <div id="timerLabel"></div>
+        <div id="gameWrapper" style="position: relative; width: 100%; max-width: 500px; margin: 0 auto;">
+            <div id="farmMap">
+                <div id="bambooLayer"></div>
+            </div>
+            <div id="waitingArea">
+                </div>
+            <div id="playersLayer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1000;"></div>
+        </div>
+        <div id="gameStatusLabel" style="font-weight: bold; color: #4caf50; margin: 10px 0;">準備好請按鈕</div>
+
+        <div id="controlPanel">
+            <button id="readyBtn" class="btn-ui btn-ready" onclick="toggleReady()">準備好了</button>
+            <button id="moveModeBtn" class="btn-ui" style="background:#9c27b0; color:white;" onclick="toggleMoveMode()">自由移動：關</button>
+            <button id="hostStartBtn" class="btn-ui" style="background:#2196f3; color:white; display:none;" onclick="hostStartGame()">開拔！</button>
+            <button id="againBtn" class="btn-ui" style="background:#4caf50; color:white; display:none; width:80%;" onclick="resetEverything()">再來一局</button>
+        </div>
+
+        <div id="chatBox"></div>
+        <div style="display: flex;">
+            <input type="text" id="chatInput" placeholder="聊兩句..." onkeypress="if(event.key==='Enter') sendChat()" style="flex:1; padding: 10px; border-radius: 20px; border: 1px solid #ccc;">
+            <button onclick="sendChat()" class="btn-ui" style="background:#4caf50; color:white; margin:0 0 0 5px;">送出</button>
+        </div>
+
+        <div id="adminPanel" style="display:none; border-top: 1px dashed #ccc; margin-top: 15px; padding-top: 10px;">
+            <button class="btn-ui" style="font-size:10px; background:#e1f5fe;" onclick="addSimulatedPlayer()">➕ 增加機器人</button>
+            <button class="btn-ui" style="font-size:10px; background:#ffebee;" onclick="clearChats()">🧹 清空聊天</button>
+            <button class="btn-ui" style="font-size:10px; background:#fff3e0;" onclick="forceResetDB()">☢️ 強制重置</button>
+        </div>
+    </div>
+
+    <script>
+        const ADMIN_UID = "U92fe108dea907bd4f4cc28d6da14318a";
+        const firebaseConfig = {
+            apiKey: "AIzaSyBHWJPT6ZyvFrZE0-d6gJW-F7EfJCQfeNE",
+            authDomain: "bamboo-game.firebaseapp.com",
+            databaseURL: "https://bamboo-game-default-rtdb.firebaseio.com/",
+            projectId: "bamboo-game",
+            storageBucket: "bamboo-game.firebasestorage.app",
+            messagingSenderId: "986027038887",
+            appId: "1:986027038887:web:d69613c79921b12f1a6382"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let currentUser = { userId: "guest_" + Math.floor(Math.random()*1000), displayName: "遊客" };
+        let isMoveMode = false;
+        let gameTimer = null;
+        let activeMoveHandler = null;
+        let activeEndHandler = null;
+
+        async function init() {
+            try {
+                await liff.init({ liffId: "2009477552-iCxgtKls" });
+                if (liff.isLoggedIn()) { currentUser = await liff.getProfile(); }
+            } catch (e) { console.log("Guest Mode"); }
+        }
+
+        function enterGame() {
+            document.getElementById('loginCard').style.display = "none";
+            document.getElementById('gameArea').style.display = "block";
+            db.ref('online_players/' + currentUser.userId).set({ 
+                name: currentUser.displayName, isReady: false, avatar: "👨‍🌾",
+                posX: 10 + Math.random() * 70, posY: 10 + Math.random() * 60
+            });
+            db.ref('online_players/' + currentUser.userId).onDisconnect().remove();
+            startGlobalSync();
+        }
+
+        function startGlobalSync() {
+            db.ref('/').on('value', (snap) => {
+                const data = snap.val();
+                if (!data) return;
+                const players = data.online_players || {};
+                const gameState = data.game_state || { status: 'WAITING' };
+                const hostId = Object.keys(players)[0];
+
+                // --- 強制監聽結束邏輯：不論誰拔到，只要數據達標就結束 ---
+                if (gameState.status === 'PLAYING') {
+                    const readyIds = Object.keys(players).filter(k => players[k].isReady);
+                    const allBamboos = gameState.bamboos || {};
+                    const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
+                    
+                    // 只要拔到的數量 >= 總人數-1
+                    if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
+                        // 由管理員或房長執行最後一擊，更新資料庫狀態
+                        if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
+                            const loserId = readyIds.find(id => players[id].targetX == null);
+                            db.ref('game_state').update({ 
+                                status: 'ENDED', 
+                                lastPlayerId: loserId || readyIds[0] 
+                            });
+                            if (gameTimer) clearInterval(gameTimer);
+                        }
+                    }
+                }
+
+                renderPlayers(players, hostId, gameState);
+                renderBamboos(gameState.bamboos || {});
+                updateUI(gameState, hostId === currentUser.userId);
+            });
+            db.ref('chats').limitToLast(10).on('value', s => {
+                const box = document.getElementById('chatBox'); box.innerHTML = "";
+                s.forEach(c => { const m = c.val(); box.innerHTML += `<div><b>${m.name}:</b> ${m.text}</div>`; });
+                box.scrollTop = box.scrollHeight;
+            });
+        }
+
+        function renderPlayers(players, hostId, gameState) {
+            const layer = document.getElementById('playersLayer');
+            const playerIds = Object.keys(players);
+            const readyPlayers = playerIds.filter(id => players[id].isReady);
+            const idlePlayers = playerIds.filter(id => !players[id].isReady);
+
+            const isAdmin = (currentUser.userId === ADMIN_UID);
+
+            playerIds.forEach(id => {
+                let farmer = document.getElementById('farmer_' + id);
+                if (!farmer) {
+                    farmer = document.createElement('div');
+                    farmer.id = 'farmer_' + id;
+                    farmer.className = 'farmer';
+                    farmer.addEventListener('mousedown', (e) => startDrag(e, id));
+                    farmer.addEventListener('touchstart', (e) => startDrag(e, id), { passive: false });
+                    layer.appendChild(farmer);
+                }
+                const p = players[id];
+                
+                if (gameState.status === 'PLAYING' || gameState.status === 'ENDED') {
+                    if (p.targetX != null) {
+                        farmer.style.left = p.targetX + "%";
+                        farmer.style.top = p.targetY + "%";
+                    } else if (p.isReady) {
+                        const idx = readyPlayers.indexOf(id);
+                        farmer.style.left = (55 + (idx % 3) * 12) + "%"; 
+                        farmer.style.top = "375px"; // 這裡是白框的高度位置
+                    } else {
+                        const idx = idlePlayers.indexOf(id);
+                        farmer.style.left = (5 + (idx % 3) * 12) + "%";
+                        farmer.style.top = "375px";
+                    }
+                } else {
+                    farmer.style.left = (p.posX || 10) + "%";
+                    farmer.style.top = (p.posY || 10) + "%";
+                }
+
+                farmer.className = `farmer ${ (gameState.status === 'WAITING' && p.isReady) ? 'is-ready' : ''}`;
+                let face = p.avatar || "👨‍🌾";
+                // 判斷是否為輸家：遊戲結束且沒有搶到筍子 (targetX 為空)
+                const isLoser = (gameState.status === 'ENDED' && p.targetX == null && p.isReady);
+
+                if (p.targetX != null) {
+                    face = "😊"; // 搶到的人笑臉
+                } else if (isLoser) {
+                    face = "🥺"; // 沒搶到的人哭臉
+                }
+
+                // 泡泡顯示：搶到才顯示「拔到了!」，輸家不顯示
+                const bubble = p.targetX != null ? `<div class="bubble">我的竹筍!</div>` : "";
+                const kickBtn = (isAdmin && id !== currentUser.userId) ? 
+                    `<span class="kick-btn" onclick="event.stopPropagation(); kickPlayer('${id}')">✕</span>` : "";
+                
+                // 修正：補回機器人控制按鈕渲染
+                let simCtrl = "";
+                if (isAdmin && id.startsWith('sim_') && gameState.status === 'WAITING') {
+                    simCtrl = `<div class="sim-ctrl">
+                        <button class="sim-btn" onclick="event.stopPropagation(); simReady('${id}', true)">備</button>
+                        <button class="sim-btn" onclick="event.stopPropagation(); simReady('${id}', false)">撤</button>
+                    </div>`;
+                }
+
+                farmer.innerHTML = `${bubble}<div style="font-size:30px;">${face}</div><div class="farmer-name ${id===hostId?'host-label':''}">${p.name}${kickBtn}</div>${simCtrl}`;
+            });
+            Array.from(layer.children).forEach(c => { if(!players[c.id.replace('farmer_','')]) c.remove(); });
+        }
+
+        // --- 移動邏輯：Admin 擁有全權限 ---
+        function startDrag(e, id) {
+            const isAdmin = (currentUser.userId === ADMIN_UID);
+            if (!isMoveMode) return;
+            if (!isAdmin && id !== currentUser.userId) return;
+
+            // 1. 防呆：如果前一個拖拽還沒結束，強制清理
+            if (activeMoveHandler) {
+                window.removeEventListener('mousemove', activeMoveHandler);
+                window.removeEventListener('touchmove', activeMoveHandler);
+                window.removeEventListener('mouseup', activeEndHandler);
+                window.removeEventListener('touchend', activeEndHandler);
+            }
+
+            const farmer = document.getElementById('farmer_' + id);
+            farmer.classList.add('dragging');
+
+            const mapRect = document.getElementById('farmMap').getBoundingClientRect();
+            activeMoveHandler = (ev) => {
+                // 阻止手機預設捲動
+                if (ev.cancelable) ev.preventDefault();
+
+                const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+                const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+
+                // 計算相對於 farmMap 的百分比位置
+                // 減去 5 是為了讓手指落在農夫中心 (農夫寬約 10%)
+                let x = ((clientX - mapRect.left) / mapRect.width) * 100 - 5;
+                let y = ((clientY - mapRect.top) / mapRect.height) * 100 - 7;
+
+                // 邊界限制：不超出地圖 0~90%
+                x = Math.max(0, Math.min(90, x));
+                y = Math.max(0, Math.min(90, y));
+
+                db.ref('online_players/' + id).update({ posX: x, posY: y });
+            };
+            activeEndHandler = () => {
+                farmer.classList.remove('dragging');
+                window.removeEventListener('mousemove', activeMoveHandler);
+                window.removeEventListener('touchmove', activeMoveHandler, { passive: false });
+                window.removeEventListener('mouseup', activeEndHandler);
+                window.removeEventListener('touchend', activeEndHandler);
+                activeMoveHandler = null;
+                activeEndHandler = null;
+            };
+
+            window.addEventListener('mousemove', activeMoveHandler);
+            window.addEventListener('touchmove', activeMoveHandler, { passive: false });
+            window.addEventListener('mouseup', activeEndHandler);
+            window.addEventListener('touchend', activeEndHandler);
+        }
+
+        function toggleMoveMode() {
+            isMoveMode = !isMoveMode;
+            const btn = document.getElementById('moveModeBtn');
+            btn.innerText = "自由移動：" + (isMoveMode ? "開" : "關");
+            // 切換 Class
+            btn.className = "btn-ui " + (isMoveMode ? "btn-move-on" : "btn-move-off");
+        }
+
+        function renderBamboos(bamboos) {
+            const layer = document.getElementById('bambooLayer');
+            const now = Date.now();
+            Object.keys(bamboos).forEach(bid => {
+                const b = bamboos[bid];
+                let elem = document.getElementById('bamboo_' + bid);
+                if (!b.claimedBy && now >= b.appearAt) {
+                    if (!elem) {
+                        elem = document.createElement('div');
+                        elem.id = 'bamboo_' + bid;
+                        elem.className = 'bamboo-item';
+                        elem.innerText = "🎋";
+                        elem.style.left = b.x + "%";
+                        elem.style.top = b.y + "%";
+                        elem.onclick = () => claimBamboo(bid);
+                        layer.appendChild(elem);
+                    }
+                } else if (elem) { elem.remove(); }
+            });
+        }
+
+        function claimBamboo(bid, simId = null) {
+            const uid = simId || currentUser.userId;
+            db.ref('game_state/bamboos/' + bid).transaction(b => {
+                if (b && !b.claimedBy) {
+                    b.claimedBy = uid;
+                    db.ref('online_players/' + uid).update({ targetX: b.x, targetY: b.y });
+                    return b;
+                }
+            }, (error, committed) => {
+                // 修正：拔完筍後，如果成功，主動跑一次結束檢查，不乾等資料庫同步
+                if (committed) checkEndCondition(); 
+            });
+        }
+
+        function checkEndCondition() {
+            db.ref('/').once('value', s => {
+                const data = s.val();
+                if (!data || data.game_state.status !== 'PLAYING') return; // 防呆：確保只在遊戲中判斷
+
+                const players = data.online_players;
+                const readyIds = Object.keys(players).filter(k => players[k].isReady);
+                const allBamboos = data.game_state.bamboos || {};
+                // 取得目前已被佔有的筍子數量
+                const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
+
+                // 關鍵修正：改用 >=，且只要場上沒筍了也得結束
+                if (readyIds.length > 1 && (claimedCount >= readyIds.length - 1)) {
+                    // 找出那個還沒搶到的人 (targetX 還是 null 的)
+                    const loserId = readyIds.find(id => players[id].targetX == null);
+                    
+                    db.ref('game_state').update({ 
+                        status: 'ENDED', 
+                        lastPlayerId: loserId || readyIds[0] // 防呆：如果都搶到了，抓第一個
+                    });
+                    if (gameTimer) clearInterval(gameTimer);
+                }
+            });
+        }
+
+        function hostStartGame() {
+            db.ref('online_players').once('value', s => {
+                const players = s.val() || {};
+                const readyIds = Object.keys(players).filter(k => players[k].isReady);
+                if (readyIds.length < 2) { alert("至少需2人準備！"); return; }
+                const bamboos = {};
+                for(let i=0; i<readyIds.length-1; i++) {
+                    bamboos['b'+i] = { x: 10+Math.random()*75, y: 10+Math.random()*60, appearAt: Date.now() + 2000 + Math.random()*8000, claimedBy: null };
+                }
+                db.ref('game_state').set({ status: 'PLAYING', bamboos: bamboos });
+                readyIds.forEach(id => db.ref('online_players/'+id).update({ targetX: null, targetY: null }));
+
+                let timeLeft = 30;
+                document.getElementById('timerLabel').innerText = "剩餘時間：" + timeLeft;
+                clearInterval(gameTimer);
+                gameTimer = setInterval(() => {
+                    timeLeft--;
+                    document.getElementById('timerLabel').innerText = "剩餘時間：" + timeLeft;
+                    if (timeLeft <= 0) { clearInterval(gameTimer); db.ref('game_state').update({ status: 'ENDED', isTimeout: true }); }
+                }, 1000);
+            });
+        }
+
+        function updateUI(state, isHost) {
+            const isAdmin = (currentUser.userId === ADMIN_UID);
+            const readyBtn = document.getElementById('readyBtn');
+            db.ref('online_players/'+currentUser.userId+'/isReady').once('value', s => {
+                const ready = s.val();
+                readyBtn.innerText = ready ? "取消準備" : "準備好了";
+                readyBtn.className = ready ? "btn-ui btn-ready active" : "btn-ui btn-ready";
+            });
+            readyBtn.disabled = (state.status !== 'WAITING');
+            document.getElementById('moveModeBtn').style.display = (state.status === 'WAITING') ? 'inline-block' : 'none';
+            document.getElementById('hostStartBtn').style.display = (isHost && state.status === 'WAITING') ? 'inline-block' : 'none';
+            document.getElementById('againBtn').style.display = ((isHost || isAdmin) && state.status === 'ENDED') ? 'inline-block' : 'none';
+            document.getElementById('waitingArea').style.display = (state.status !== 'WAITING') ? 'flex' : 'none';
+            document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('moveModeBtn').className = "btn-ui " + (isMoveMode ? "btn-move-on" : "btn-move-off");
+            const againBtn = document.getElementById('againBtn');
+            if (state.status === 'ENDED') {
+                // 只要是管理員或是房長，在結束後都能看到按鈕
+                againBtn.style.display = (isHost || isAdmin) ? 'inline-block' : 'none';
+                document.getElementById('gameStatusLabel').innerText = "遊戲結束！";
+                document.getElementById('gameStatusLabel').style.color = "#f44336"; // 變紅色較醒目
+            } else {
+                againBtn.style.display = 'none';
+                if (state.status === 'PLAYING') {
+                    document.getElementById('gameStatusLabel').innerText = "快搶！";
+                }
+            }
+        }
+
+        function toggleReady() {
+            db.ref('online_players/'+currentUser.userId+'/isReady').once('value', s => {
+                db.ref('online_players/'+currentUser.userId).update({ isReady: !s.val() });
+            });
+        }
+
+        function resetEverything() {
+            clearInterval(gameTimer);
+            db.ref('game_state').set({ status: 'WAITING' });
+            db.ref('online_players').once('value', s => {
+                s.forEach(child => {
+                    db.ref('online_players/' + child.key).update({ 
+                        isReady: false, targetX: null, targetY: null,
+                        posX: 10 + Math.random() * 70, posY: 10 + Math.random() * 60
+                    });
+                });
+            });
+        }
+
+        function forceResetDB() { if(confirm("強制重置？")) db.ref('/').set(null); location.reload(); }
+        function clearChats() { db.ref('chats').remove(); }
+        function sendChat() {
+            const i = document.getElementById('chatInput');
+            if (i.value.trim()) { db.ref('chats').push({ name: currentUser.displayName, text: i.value }); i.value = ""; }
+        }
+        function addSimulatedPlayer() {
+            const id = 'sim_' + Date.now();
+            db.ref('online_players/' + id).set({ 
+                name: '機器人', isReady: false, avatar: "🤖",
+                posX: 10 + Math.random() * 70, posY: 10 + Math.random() * 60
+            });
+        }
+        function simReady(id, r) { db.ref('online_players/' + id).update({ isReady: r }); }
+        function kickPlayer(id) { db.ref('online_players/' + id).remove(); }
+
+        setInterval(() => {
+            db.ref('/').once('value', s => {
+                const data = s.val();
+                if (!data || data.game_state?.status !== 'PLAYING') return;
+                
+                const players = data.online_players;
+                const bamboos = data.game_state.bamboos || {};
+                
+                Object.keys(players).forEach(pid => {
+                    // 機器人還沒搶到，且場上有筍子
+                    if (pid.startsWith('sim_') && players[pid].isReady && players[pid].targetX == null) {
+                        const bId = Object.keys(bamboos).find(bid => !bamboos[bid].claimedBy && Date.now() >= bamboos[bid].appearAt);
+                        if (bId) {
+                            claimBamboo(bId, pid); // 僅執行搶筍
+                        }
+                    }
+                });
+            });
+        }, 1000); // 縮短到1秒，讓反應更快
+
+        init();
+    </script>
+</body>
+</html>
