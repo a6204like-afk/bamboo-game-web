@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 3.8：管理員全權限版</title>
+    <title>🎋 拔竹筍 3.9：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f1f8e9; margin: 0; padding: 10px; min-height: 100vh; overscroll-behavior: none; overflow: hidden; touch-action: pan-x pan-y;}
+        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f1f8e9; margin: 0; padding: 10px; min-height: 100vh; overscroll-behavior: none; overflow: hidden; touch-action: none;}
         #farmMap {
             width: 100%; height: 350px; background-color: #dcedc8; border: 4px solid #8bc34a;
             border-radius: 20px 20px 0 0; position: relative; overflow: hidden; margin: 5px auto 0 auto;
@@ -25,7 +25,7 @@
         .area-label { position: absolute; top: 5px; font-size: 12px; color: #666; font-weight: bold; }
         .bamboo-item { position: absolute; font-size: 40px; cursor: pointer; z-index: 100; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
-        .farmer { width: 60px; height: 95px; position: absolute; display: flex; flex-direction: column; align-items: center; z-index: 10; transition: all 0.4s ease-out; pointer-events: auto; touch-action: none !important; -webkit-touch-callout: none; user-select: none;}
+        .farmer { width: 60px; height: 95px; position: absolute; display: flex; flex-direction: column; align-items: center; z-index: 10; transition: left 0.1s ease-out, top 0.1s ease-out; pointer-events: auto; touch-action: none; -webkit-touch-callout: none; user-select: none; will-change: left, top;}
         .farmer.dragging { transition: none; z-index: 1000; scale: 1.1; }
         .farmer.is-ready { background: rgba(255, 235, 59, 0.4); border: 2px solid #fbc02d; border-radius: 10px; box-shadow: 0 0 15px rgba(251, 192, 45, 0.6); }
         .farmer.not-ready { filter: grayscale(0.5); }
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 3.8</h2> 
+        <h2>🧑‍🌾 拔筍農場 3.9</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -261,50 +261,64 @@
             Array.from(layer.children).forEach(c => { if(!players[c.id.replace('farmer_','')]) c.remove(); });
         }
 
-        // --- 移動邏輯：Admin 擁有全權限 ---
+        // --- 移動邏輯：本地即時更新，停止拖曳才寫入 Firebase ---
         function startDrag(e, id) {
             const isAdmin = (currentUser.userId === ADMIN_UID);
             if (!isMoveMode) return;
             if (!isAdmin && id !== currentUser.userId) return;
 
-            // 1. 防呆：如果前一個拖拽還沒結束，強制清理
+            if (e.cancelable) e.preventDefault();
+
+            // 防呆：如果前一個拖拽還沒結束，強制清理
             if (activeMoveHandler) {
                 window.removeEventListener('mousemove', activeMoveHandler);
                 window.removeEventListener('touchmove', activeMoveHandler);
                 window.removeEventListener('mouseup', activeEndHandler);
                 window.removeEventListener('touchend', activeEndHandler);
+                activeMoveHandler = null;
+                activeEndHandler = null;
             }
 
             const farmer = document.getElementById('farmer_' + id);
             farmer.classList.add('dragging');
+            // 拖曳中關閉 transition，讓移動即時跟手
+            farmer.style.transition = 'none';
 
-            const mapRect = document.getElementById('farmMap').getBoundingClientRect();
-            activeMoveHandler = (ev) => {
-                // 阻止手機預設捲動
-                if (ev.cancelable) ev.preventDefault();
+            let lastX = 0, lastY = 0;
 
+            const getPos = (ev) => {
+                // 每次都重新取 mapRect，避免頁面捲動造成偏移
+                const mapRect = document.getElementById('farmMap').getBoundingClientRect();
                 const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
                 const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-
-                // 計算相對於 farmMap 的百分比位置
-                // 減去 5 是為了讓手指落在農夫中心 (農夫寬約 10%)
                 let x = ((clientX - mapRect.left) / mapRect.width) * 100 - 5;
                 let y = ((clientY - mapRect.top) / mapRect.height) * 100 - 7;
-
-                // 邊界限制：不超出地圖 0~90%
                 x = Math.max(0, Math.min(90, x));
                 y = Math.max(0, Math.min(90, y));
-
-                db.ref('online_players/' + id).update({ posX: x, posY: y });
+                return { x, y };
             };
+
+            activeMoveHandler = (ev) => {
+                if (ev.cancelable) ev.preventDefault();
+                const { x, y } = getPos(ev);
+                lastX = x;
+                lastY = y;
+                // 本地即時更新 DOM，不等 Firebase
+                farmer.style.left = x + '%';
+                farmer.style.top = y + '%';
+            };
+
             activeEndHandler = () => {
                 farmer.classList.remove('dragging');
+                farmer.style.transition = '';
                 window.removeEventListener('mousemove', activeMoveHandler);
-                window.removeEventListener('touchmove', activeMoveHandler, { passive: false });
+                window.removeEventListener('touchmove', activeMoveHandler);
                 window.removeEventListener('mouseup', activeEndHandler);
                 window.removeEventListener('touchend', activeEndHandler);
                 activeMoveHandler = null;
                 activeEndHandler = null;
+                // 拖曳結束才寫一次 Firebase
+                db.ref('online_players/' + id).update({ posX: lastX, posY: lastY });
             };
 
             window.addEventListener('mousemove', activeMoveHandler);
