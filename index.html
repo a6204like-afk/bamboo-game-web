@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 4.0：管理員全權限版</title>
+    <title>🎋 拔竹筍 4.1：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 4.0</h2> 
+        <h2>🧑‍🌾 拔筍農場 4.1</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -384,10 +384,10 @@
                 if (readyIds.length < 2) { alert("至少需2人準備！"); return; }
                 const bamboos = {};
                 for(let i=0; i<readyIds.length-1; i++) {
-                    bamboos['b'+i] = { x: 10+Math.random()*75, y: 10+Math.random()*60, appearAt: Date.now() + 2000 + Math.random()*8000, claimedBy: null };
+                    bamboos['b'+i] = { x: 10+Math.random()*75, y: 10+Math.random()*60, appearAt: Date.now() + 1000 + Math.random()*7000, claimedBy: null };
                 }
                 // 把結束時間存進 Firebase，所有人從 DB 算倒數，不依賴房長本地計時器
-                const endTime = Date.now() + 30000;
+                const endTime = Date.now() + 15000;
                 db.ref('game_state').set({ status: 'PLAYING', bamboos: bamboos, endTime: endTime });
                 readyIds.forEach(id => db.ref('online_players/'+id).update({ targetX: null, targetY: null }));
             });
@@ -424,7 +424,7 @@
             });
             readyBtn.disabled = (state.status !== 'WAITING');
             document.getElementById('moveModeBtn').style.display = (state.status === 'WAITING') ? 'inline-block' : 'none';
-            document.getElementById('hostStartBtn').style.display = (isHost && state.status === 'WAITING') ? 'inline-block' : 'none';
+            document.getElementById('hostStartBtn').style.display = ((isHost || isAdmin) && state.status === 'WAITING') ? 'inline-block' : 'none';
             document.getElementById('againBtn').style.display = ((isHost || isAdmin) && state.status === 'ENDED') ? 'inline-block' : 'none';
             document.getElementById('waitingArea').style.display = (state.status !== 'WAITING') ? 'flex' : 'none';
             document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
