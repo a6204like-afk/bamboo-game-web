@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 3.9：管理員全權限版</title>
+    <title>🎋 拔竹筍 4.0：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 3.9</h2> 
+        <h2>🧑‍🌾 拔筍農場 4.0</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -266,6 +266,10 @@
             const isAdmin = (currentUser.userId === ADMIN_UID);
             if (!isMoveMode) return;
             if (!isAdmin && id !== currentUser.userId) return;
+
+            // 如果點到的是踢人按鈕或機器人控制按鈕，不觸發拖曳
+            const target = e.target || e.srcElement;
+            if (target.classList.contains('kick-btn') || target.classList.contains('sim-btn')) return;
 
             if (e.cancelable) e.preventDefault();
 
