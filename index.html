@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 3.6：管理員全權限版</title>
+    <title>🎋 拔竹筍 3.7：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 3.6</h2> 
+        <h2>🧑‍🌾 拔筍農場 3.7</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -132,11 +132,16 @@
                 const gameState = data.game_state || { status: 'WAITING' };
                 const hostId = Object.keys(players)[0];
 
-                // --- 強制監聽結束邏輯：不論誰拔到，只要數據達標就結束 ---
+                // --- 結束判斷：只有房長/Admin 負責寫入 ENDED ---
                 if (gameState.status === 'PLAYING') {
                     const readyIds = Object.keys(players).filter(k => players[k].isReady);
                     const allBamboos = gameState.bamboos || {};
                     const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
+
+                    // 啟動本地倒數（從 Firebase 的 endTime 計算，避免重複啟動）
+                    if (gameState.endTime && !gameTimer) {
+                        startLocalTimer(gameState.endTime);
+                    }
                     
                     // 只要拔到的數量 >= 總人數-1
                     if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
@@ -148,7 +153,14 @@
                                 lastPlayerId: loserId || readyIds[0] 
                             });
                             if (gameTimer) clearInterval(gameTimer);
+                            gameTimer = null;
                         }
+                    }
+                } else {
+                    // 非 PLAYING 狀態時清掉計時器
+                    if (gameState.status !== 'PLAYING' && gameTimer) {
+                        clearInterval(gameTimer);
+                        gameTimer = null;
                     }
                 }
 
@@ -322,39 +334,17 @@
 
         function claimBamboo(bid, simId = null) {
             const uid = simId || currentUser.userId;
+            // transaction 裡只更新筍子狀態，不做其他 DB 操作
             db.ref('game_state/bamboos/' + bid).transaction(b => {
                 if (b && !b.claimedBy) {
                     b.claimedBy = uid;
-                    db.ref('online_players/' + uid).update({ targetX: b.x, targetY: b.y });
                     return b;
                 }
-            }, (error, committed) => {
-                // 修正：拔完筍後，如果成功，主動跑一次結束檢查，不乾等資料庫同步
-                if (committed) checkEndCondition(); 
-            });
-        }
-
-        function checkEndCondition() {
-            db.ref('/').once('value', s => {
-                const data = s.val();
-                if (!data || data.game_state.status !== 'PLAYING') return; // 防呆：確保只在遊戲中判斷
-
-                const players = data.online_players;
-                const readyIds = Object.keys(players).filter(k => players[k].isReady);
-                const allBamboos = data.game_state.bamboos || {};
-                // 取得目前已被佔有的筍子數量
-                const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
-
-                // 關鍵修正：改用 >=，且只要場上沒筍了也得結束
-                if (readyIds.length > 1 && (claimedCount >= readyIds.length - 1)) {
-                    // 找出那個還沒搶到的人 (targetX 還是 null 的)
-                    const loserId = readyIds.find(id => players[id].targetX == null);
-                    
-                    db.ref('game_state').update({ 
-                        status: 'ENDED', 
-                        lastPlayerId: loserId || readyIds[0] // 防呆：如果都搶到了，抓第一個
-                    });
-                    if (gameTimer) clearInterval(gameTimer);
+            }, (error, committed, snapshot) => {
+                // transaction 成功後，才在回呼裡更新玩家位置
+                if (committed && snapshot) {
+                    const b = snapshot.val();
+                    db.ref('online_players/' + uid).update({ targetX: b.x, targetY: b.y });
                 }
             });
         }
@@ -368,18 +358,32 @@
                 for(let i=0; i<readyIds.length-1; i++) {
                     bamboos['b'+i] = { x: 10+Math.random()*75, y: 10+Math.random()*60, appearAt: Date.now() + 2000 + Math.random()*8000, claimedBy: null };
                 }
-                db.ref('game_state').set({ status: 'PLAYING', bamboos: bamboos });
+                // 把結束時間存進 Firebase，所有人從 DB 算倒數，不依賴房長本地計時器
+                const endTime = Date.now() + 30000;
+                db.ref('game_state').set({ status: 'PLAYING', bamboos: bamboos, endTime: endTime });
                 readyIds.forEach(id => db.ref('online_players/'+id).update({ targetX: null, targetY: null }));
-
-                let timeLeft = 30;
-                document.getElementById('timerLabel').innerText = "剩餘時間：" + timeLeft;
-                clearInterval(gameTimer);
-                gameTimer = setInterval(() => {
-                    timeLeft--;
-                    document.getElementById('timerLabel').innerText = "剩餘時間：" + timeLeft;
-                    if (timeLeft <= 0) { clearInterval(gameTimer); db.ref('game_state').update({ status: 'ENDED', isTimeout: true }); }
-                }, 1000);
             });
+        }
+
+        function startLocalTimer(endTime) {
+            clearInterval(gameTimer);
+            gameTimer = setInterval(() => {
+                const timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+                document.getElementById('timerLabel').innerText = "剩餘時間：" + timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(gameTimer);
+                    // 只有房長或 Admin 負責把狀態寫進 DB
+                    db.ref('/').once('value', snap => {
+                        const data = snap.val();
+                        if (!data || data.game_state?.status !== 'PLAYING') return;
+                        const players = data.online_players || {};
+                        const hostId = Object.keys(players)[0];
+                        if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
+                            db.ref('game_state').update({ status: 'ENDED', isTimeout: true });
+                        }
+                    });
+                }
+            }, 1000);
         }
 
         function updateUI(state, isHost) {
@@ -419,6 +423,7 @@
 
         function resetEverything() {
             clearInterval(gameTimer);
+            gameTimer = null;
             db.ref('game_state').set({ status: 'WAITING' });
             db.ref('online_players').once('value', s => {
                 s.forEach(child => {
