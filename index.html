@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 4.1：管理員全權限版</title>
+    <title>🎋 拔竹筍 4.2：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 4.1</h2> 
+        <h2>🧑‍🌾 拔筍農場 4.2</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -131,6 +131,25 @@
                 posX: 10 + Math.random() * 70, posY: 10 + Math.random() * 60
             });
             db.ref('online_players/' + currentUser.userId).onDisconnect().remove();
+
+            // 房長鎖定：確認目前有沒有房長，沒有的話自己當房長
+            // Admin 離開時不清除 hostId，確保回來後還是房長
+            db.ref('hostId').once('value', snap => {
+                const existingHost = snap.val();
+                if (!existingHost) {
+                    // 沒有房長，自己當
+                    db.ref('hostId').set(currentUser.userId);
+                    if (currentUser.userId !== ADMIN_UID) {
+                        // 非 Admin 離開時清除房長
+                        db.ref('hostId').onDisconnect().remove();
+                    }
+                } else if (existingHost === currentUser.userId && currentUser.userId !== ADMIN_UID) {
+                    // 自己是房長（重新進入），非 Admin 設定離開清除
+                    db.ref('hostId').onDisconnect().remove();
+                }
+                // Admin 進來不搶房長，也不設 onDisconnect
+            });
+
             startGlobalSync();
         }
 
@@ -140,7 +159,28 @@
                 if (!data) return;
                 const players = data.online_players || {};
                 const gameState = data.game_state || { status: 'WAITING' };
-                const hostId = Object.keys(players)[0];
+                const playerIds = Object.keys(players);
+
+                // 若房長不在線上了，自動指派下一位（只由第一位玩家執行，避免競爭）
+                let hostId = data.hostId;
+                if (!hostId && playerIds.length > 0) {
+                    hostId = playerIds[0];
+                    if (currentUser.userId === playerIds[0]) {
+                        db.ref('hostId').set(hostId);
+                        if (currentUser.userId !== ADMIN_UID) {
+                            db.ref('hostId').onDisconnect().remove();
+                        }
+                    }
+                } else if (hostId && !players[hostId] && playerIds.length > 0) {
+                    // hostId 對應的玩家已離線，重新指派
+                    hostId = playerIds[0];
+                    if (currentUser.userId === playerIds[0]) {
+                        db.ref('hostId').set(hostId);
+                        if (currentUser.userId !== ADMIN_UID) {
+                            db.ref('hostId').onDisconnect().remove();
+                        }
+                    }
+                }
 
                 // --- 結束判斷：只有房長/Admin 負責寫入 ENDED ---
                 if (gameState.status === 'PLAYING') {
@@ -362,6 +402,20 @@
 
         function claimBamboo(bid, simId = null) {
             const uid = simId || currentUser.userId;
+
+            // 未準備或已搶到竹筍的人不能點（機器人 simId 傳入時跳過此檢查）
+            if (!simId) {
+                db.ref('online_players/' + uid).once('value', snap => {
+                    const p = snap.val();
+                    if (!p || !p.isReady || p.targetX != null) return;
+                    _doClaimBamboo(bid, uid);
+                });
+                return;
+            }
+            _doClaimBamboo(bid, uid);
+        }
+
+        function _doClaimBamboo(bid, uid) {
             // transaction 裡只更新筍子狀態，不做其他 DB 操作
             db.ref('game_state/bamboos/' + bid).transaction(b => {
                 if (b && !b.claimedBy) {
@@ -405,7 +459,7 @@
                         const data = snap.val();
                         if (!data || data.game_state?.status !== 'PLAYING') return;
                         const players = data.online_players || {};
-                        const hostId = Object.keys(players)[0];
+                        const hostId = data.hostId || Object.keys(players)[0];
                         if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
                             db.ref('game_state').update({ status: 'ENDED', isTimeout: true });
                         }
