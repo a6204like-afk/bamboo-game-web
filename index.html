@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 4.2：管理員全權限版</title>
+    <title>🎋 拔竹筍 4.3：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 4.2</h2> 
+        <h2>🧑‍🌾 拔筍農場 4.3</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -282,8 +282,7 @@
                     face = "🥺"; // 沒搶到的人哭臉
                 }
 
-                // 泡泡顯示：搶到才顯示「拔到了!」，輸家不顯示
-                const bubble = p.targetX != null ? `<div class="bubble">我的竹筍!</div>` : "";
+                const bubble = p.claimedOrder != null ? `<div class="bubble">${p.claimedOrder}隻竹筍！</div>` : "";
                 const kickBtn = (isAdmin && id !== currentUser.userId) ? 
                     `<span class="kick-btn" onclick="event.stopPropagation(); kickPlayer('${id}')">✕</span>` : "";
                 
@@ -417,17 +416,22 @@
 
         function _doClaimBamboo(bid, uid) {
             // transaction 裡只更新筍子狀態，不做其他 DB 操作
-            db.ref('game_state/bamboos/' + bid).transaction(b => {
-                if (b && !b.claimedBy) {
-                    b.claimedBy = uid;
-                    return b;
-                }
-            }, (error, committed, snapshot) => {
-                // transaction 成功後，才在回呼裡更新玩家位置
-                if (committed && snapshot) {
-                    const b = snapshot.val();
-                    db.ref('online_players/' + uid).update({ targetX: b.x, targetY: b.y });
-                }
+            db.ref('/').once('value', snap => {
+                const allBamboos = snap.val()?.game_state?.bamboos || {};
+                const claimedOrder = Object.values(allBamboos).filter(b => b.claimedBy).length + 1;
+                db.ref('game_state/bamboos/' + bid).transaction(b => {
+                    if (b && !b.claimedBy) {
+                        b.claimedBy = uid;
+                        b.claimedOrder = claimedOrder;
+                        return b;
+                    }
+                }, (error, committed, snapshot) => {
+                    // transaction 成功後，才在回呼裡更新玩家位置
+                    if (committed && snapshot) {
+                        const b = snapshot.val();
+                        db.ref('online_players/' + uid).update({ targetX: b.x, targetY: b.y, claimedOrder: b.claimedOrder });
+                    }
+                });
             });
         }
 
@@ -510,7 +514,7 @@
             db.ref('online_players').once('value', s => {
                 s.forEach(child => {
                     db.ref('online_players/' + child.key).update({ 
-                        isReady: false, targetX: null, targetY: null,
+                        isReady: false, targetX: null, targetY: null, claimedOrder: null,
                         posX: 10 + Math.random() * 70, posY: 10 + Math.random() * 60
                     });
                 });
