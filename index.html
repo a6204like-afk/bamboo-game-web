@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 4.3：管理員全權限版</title>
+    <title>🎋 拔竹筍 4.4：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 4.3</h2> 
+        <h2>🧑‍🌾 拔筍農場 4.4</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -153,70 +153,76 @@
             startGlobalSync();
         }
 
-        function startGlobalSync() {
-            db.ref('/').on('value', (snap) => {
-                const data = snap.val();
-                if (!data) return;
-                const players = data.online_players || {};
-                const gameState = data.game_state || { status: 'WAITING' };
-                const playerIds = Object.keys(players);
+        // 合併三個節點的資料，統一觸發畫面更新
+        let _syncData = { players: {}, gameState: { status: 'WAITING' }, hostId: null };
 
-                // 若房長不在線上了，自動指派下一位（只由第一位玩家執行，避免競爭）
-                let hostId = data.hostId;
-                if (!hostId && playerIds.length > 0) {
-                    hostId = playerIds[0];
-                    if (currentUser.userId === playerIds[0]) {
-                        db.ref('hostId').set(hostId);
-                        if (currentUser.userId !== ADMIN_UID) {
-                            db.ref('hostId').onDisconnect().remove();
-                        }
-                    }
-                } else if (hostId && !players[hostId] && playerIds.length > 0) {
-                    // hostId 對應的玩家已離線，重新指派
-                    hostId = playerIds[0];
-                    if (currentUser.userId === playerIds[0]) {
-                        db.ref('hostId').set(hostId);
-                        if (currentUser.userId !== ADMIN_UID) {
-                            db.ref('hostId').onDisconnect().remove();
-                        }
-                    }
+        function _onSyncUpdate() {
+            const players = _syncData.players;
+            const gameState = _syncData.gameState;
+            const playerIds = Object.keys(players);
+
+            // 若房長不在線上了，自動指派下一位
+            let hostId = _syncData.hostId;
+            if (!hostId && playerIds.length > 0) {
+                hostId = playerIds[0];
+                if (currentUser.userId === playerIds[0]) {
+                    db.ref('hostId').set(hostId);
+                    if (currentUser.userId !== ADMIN_UID) db.ref('hostId').onDisconnect().remove();
+                }
+            } else if (hostId && !players[hostId] && playerIds.length > 0) {
+                hostId = playerIds[0];
+                if (currentUser.userId === playerIds[0]) {
+                    db.ref('hostId').set(hostId);
+                    if (currentUser.userId !== ADMIN_UID) db.ref('hostId').onDisconnect().remove();
+                }
+            }
+
+            // --- 結束判斷：只有房長/Admin 負責寫入 ENDED ---
+            if (gameState.status === 'PLAYING') {
+                const readyIds = Object.keys(players).filter(k => players[k].isReady);
+                const allBamboos = gameState.bamboos || {};
+                const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
+
+                if (gameState.endTime && !gameTimer) {
+                    startLocalTimer(gameState.endTime);
                 }
 
-                // --- 結束判斷：只有房長/Admin 負責寫入 ENDED ---
-                if (gameState.status === 'PLAYING') {
-                    const readyIds = Object.keys(players).filter(k => players[k].isReady);
-                    const allBamboos = gameState.bamboos || {};
-                    const claimedCount = Object.keys(allBamboos).filter(k => allBamboos[k].claimedBy).length;
-
-                    // 啟動本地倒數（從 Firebase 的 endTime 計算，避免重複啟動）
-                    if (gameState.endTime && !gameTimer) {
-                        startLocalTimer(gameState.endTime);
-                    }
-                    
-                    // 只要拔到的數量 >= 總人數-1
-                    if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
-                        // 由管理員或房長執行最後一擊，更新資料庫狀態
-                        if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
-                            const loserId = readyIds.find(id => players[id].targetX == null);
-                            db.ref('game_state').update({ 
-                                status: 'ENDED', 
-                                lastPlayerId: loserId || readyIds[0] 
-                            });
-                            if (gameTimer) clearInterval(gameTimer);
-                            gameTimer = null;
-                        }
-                    }
-                } else {
-                    // 非 PLAYING 狀態時清掉計時器
-                    if (gameState.status !== 'PLAYING' && gameTimer) {
-                        clearInterval(gameTimer);
+                if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
+                    if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
+                        const loserId = readyIds.find(id => players[id].targetX == null);
+                        db.ref('game_state').update({
+                            status: 'ENDED',
+                            lastPlayerId: loserId || readyIds[0]
+                        });
+                        if (gameTimer) clearInterval(gameTimer);
                         gameTimer = null;
                     }
                 }
+            } else {
+                if (gameTimer) {
+                    clearInterval(gameTimer);
+                    gameTimer = null;
+                }
+            }
 
-                renderPlayers(players, hostId, gameState);
-                renderBamboos(gameState.bamboos || {});
-                updateUI(gameState, hostId === currentUser.userId);
+            renderPlayers(players, hostId, gameState);
+            renderBamboos(gameState.bamboos || {});
+            updateUI(gameState, hostId === currentUser.userId);
+        }
+
+        function startGlobalSync() {
+            // 分開監聽各節點，避免需要根目錄讀取權限
+            db.ref('online_players').on('value', snap => {
+                _syncData.players = snap.val() || {};
+                _onSyncUpdate();
+            });
+            db.ref('game_state').on('value', snap => {
+                _syncData.gameState = snap.val() || { status: 'WAITING' };
+                _onSyncUpdate();
+            });
+            db.ref('hostId').on('value', snap => {
+                _syncData.hostId = snap.val();
+                _onSyncUpdate();
             });
             db.ref('chats').limitToLast(10).on('value', s => {
                 const box = document.getElementById('chatBox'); box.innerHTML = "";
@@ -416,8 +422,8 @@
 
         function _doClaimBamboo(bid, uid) {
             // transaction 裡只更新筍子狀態，不做其他 DB 操作
-            db.ref('/').once('value', snap => {
-                const allBamboos = snap.val()?.game_state?.bamboos || {};
+            db.ref('game_state/bamboos').once('value', snap => {
+                const allBamboos = snap.val() || {};
                 const claimedOrder = Object.values(allBamboos).filter(b => b.claimedBy).length + 1;
                 db.ref('game_state/bamboos/' + bid).transaction(b => {
                     if (b && !b.claimedBy) {
@@ -459,15 +465,13 @@
                 if (timeLeft <= 0) {
                     clearInterval(gameTimer);
                     // 只有房長或 Admin 負責把狀態寫進 DB
-                    db.ref('/').once('value', snap => {
-                        const data = snap.val();
-                        if (!data || data.game_state?.status !== 'PLAYING') return;
-                        const players = data.online_players || {};
-                        const hostId = data.hostId || Object.keys(players)[0];
-                        if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
-                            db.ref('game_state').update({ status: 'ENDED', isTimeout: true });
-                        }
-                    });
+                    const gs = _syncData.gameState;
+                    const players = _syncData.players;
+                    if (!gs || gs.status !== 'PLAYING') return;
+                    const hostId = _syncData.hostId || Object.keys(players)[0];
+                    if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
+                        db.ref('game_state').update({ status: 'ENDED', isTimeout: true });
+                    }
                 }
             }, 1000);
         }
@@ -538,22 +542,17 @@
         function kickPlayer(id) { db.ref('online_players/' + id).remove(); }
 
         setInterval(() => {
-            db.ref('/').once('value', s => {
-                const data = s.val();
-                if (!data || data.game_state?.status !== 'PLAYING') return;
-                
-                const players = data.online_players;
-                const bamboos = data.game_state.bamboos || {};
-                
-                Object.keys(players).forEach(pid => {
-                    // 機器人還沒搶到，且場上有筍子
-                    if (pid.startsWith('sim_') && players[pid].isReady && players[pid].targetX == null) {
-                        const bId = Object.keys(bamboos).find(bid => !bamboos[bid].claimedBy && Date.now() >= bamboos[bid].appearAt);
-                        if (bId) {
-                            claimBamboo(bId, pid); // 僅執行搶筍
-                        }
-                    }
-                });
+            // 使用已快取的 _syncData，不需要再打一次 DB
+            const gameState = _syncData.gameState;
+            const players = _syncData.players;
+            if (!gameState || gameState.status !== 'PLAYING') return;
+
+            const bamboos = gameState.bamboos || {};
+            Object.keys(players).forEach(pid => {
+                if (pid.startsWith('sim_') && players[pid].isReady && players[pid].targetX == null) {
+                    const bId = Object.keys(bamboos).find(bid => !bamboos[bid].claimedBy && Date.now() >= bamboos[bid].appearAt);
+                    if (bId) claimBamboo(bId, pid);
+                }
             });
         }, 1000); // 縮短到1秒，讓反應更快
 
