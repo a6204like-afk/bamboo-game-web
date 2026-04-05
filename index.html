@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎋 拔竹筍 4.4：管理員全權限版</title>
+    <title>🎋 拔竹筍 4.5：管理員全權限版</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
 <body>
 
     <div id="loginCard" class="card">
-        <h2>🧑‍🌾 拔筍農場 4.4</h2> 
+        <h2>🧑‍🌾 拔筍農場 4.5</h2> 
         <button id="enterGameBtn" class="btn-ui" style="background:#2196f3; color:white;" onclick="enterGame()">進入田地</button>
     </div>
 
@@ -103,6 +103,7 @@
         let currentUser = { userId: "guest_" + Math.floor(Math.random()*1000), displayName: "遊客" };
         let isMoveMode = false;
         let gameTimer = null;
+        let bambooTimer = null;
         let activeMoveHandler = null;
         let activeEndHandler = null;
 
@@ -187,6 +188,13 @@
                     startLocalTimer(gameState.endTime);
                 }
 
+                // 本地每秒刷新竹筍出現，不依賴 Firebase 事件
+                if (!bambooTimer) {
+                    bambooTimer = setInterval(() => {
+                        renderBamboos(_syncData.gameState.bamboos || {});
+                    }, 500);
+                }
+
                 if (readyIds.length > 1 && claimedCount >= readyIds.length - 1) {
                     if (currentUser.userId === hostId || currentUser.userId === ADMIN_UID) {
                         const loserId = readyIds.find(id => players[id].targetX == null);
@@ -202,6 +210,10 @@
                 if (gameTimer) {
                     clearInterval(gameTimer);
                     gameTimer = null;
+                }
+                if (bambooTimer) {
+                    clearInterval(bambooTimer);
+                    bambooTimer = null;
                 }
             }
 
@@ -288,6 +300,7 @@
                     face = "🥺"; // 沒搶到的人哭臉
                 }
 
+                // 泡泡顯示：搶到才顯示「拔到了!」，輸家不顯示
                 const bubble = p.claimedOrder != null ? `<div class="bubble">${p.claimedOrder}隻竹筍！</div>` : "";
                 const kickBtn = (isAdmin && id !== currentUser.userId) ? 
                     `<span class="kick-btn" onclick="event.stopPropagation(); kickPlayer('${id}')">✕</span>` : "";
@@ -514,6 +527,8 @@
         function resetEverything() {
             clearInterval(gameTimer);
             gameTimer = null;
+            clearInterval(bambooTimer);
+            bambooTimer = null;
             db.ref('game_state').set({ status: 'WAITING' });
             db.ref('online_players').once('value', s => {
                 s.forEach(child => {
